@@ -53,6 +53,8 @@ export default function DetailPane({ task, project, onMemoChange, onUpdateTask, 
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showStaffRequest, setShowStaffRequest] = useState(false);
   const [requestSent, setRequestSent] = useState(false);
+  const [showVendorRequest, setShowVendorRequest] = useState(false);
+  const [vendorSent, setVendorSent] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
@@ -77,6 +79,8 @@ export default function DetailPane({ task, project, onMemoChange, onUpdateTask, 
     setInput("");
     setShowStaffRequest(false);
     setRequestSent(false);
+    setShowVendorRequest(false);
+    setVendorSent(false);
   }, [task?.id]);
 
   useEffect(() => {
@@ -130,6 +134,11 @@ export default function DetailPane({ task, project, onMemoChange, onUpdateTask, 
   // スタッフへの依頼定型文
   const staffRequestDraft = task
     ? `【タスク依頼】\nプロジェクト：${project?.name ?? "未設定"}\nタスク：${task.title}\n期限：${task.due}${task.urgent ? "（急ぎ）" : ""}\n${task.memo ? `\nメモ：\n${task.memo}\n` : ""}\n対応をお願いします。`
+    : "";
+
+  // 協力業者への依頼定型文（LINE）
+  const vendorRequestDraft = task
+    ? `いつもお世話になっております。\nSUGAR DESIGN OFFICEです。\n\n下記の件につきまして、ご対応をお願いしたくご連絡いたしました。\n\n■ プロジェクト：${project?.name ?? "未設定"}\n■ 内容：${task.title}\n■ 期限：${task.due}${task.urgent ? "（至急）" : ""}\n${task.memo ? `\n■ 詳細：\n${task.memo}\n` : ""}\nご確認の上、折り返しご連絡いただけますと幸いです。\nよろしくお願いいたします。`
     : "";
 
   // ── チャットビュー ──────────────────────────────────────────────
@@ -312,6 +321,41 @@ export default function DetailPane({ task, project, onMemoChange, onUpdateTask, 
           </div>
         )}
 
+        {/* 協力業者へ依頼（LINE） */}
+        <button
+          style={{ ...styles.staffRequestBtn, ...styles.vendorRequestBtn }}
+          onClick={() => { setShowVendorRequest(true); setVendorSent(false); }}
+        >
+          <i className="ti ti-message-circle" style={{ fontSize: 13 }} aria-hidden="true" />
+          協力業者様へ依頼
+        </button>
+
+        {showVendorRequest && (
+          <div style={styles.staffPanel}>
+            <div style={{ ...styles.staffPanelHeader, ...styles.vendorPanelHeader }}>
+              <i className="ti ti-brand-line" style={{ fontSize: 14 }} aria-hidden="true" />
+              <span>LINE 送信プレビュー</span>
+              <button style={styles.staffPanelClose} onClick={() => setShowVendorRequest(false)}>
+                <i className="ti ti-x" />
+              </button>
+            </div>
+            <pre style={styles.draftText}>{vendorRequestDraft}</pre>
+            {vendorSent ? (
+              <div style={styles.sentBadge}>
+                <i className="ti ti-clock" style={{ fontSize: 11 }} /> LINE連携後に送信できます
+              </div>
+            ) : (
+              <button
+                style={styles.lineSendBtn}
+                onClick={() => setVendorSent(true)}
+              >
+                <i className="ti ti-brand-line" style={{ fontSize: 14 }} />
+                LINEに送信する
+              </button>
+            )}
+          </div>
+        )}
+
       </div>
     </div>
   );
@@ -350,6 +394,9 @@ const styles: Record<string, React.CSSProperties> = {
   draftText: { padding: "10px 12px", fontSize: 11.5, color: "var(--color-text-secondary)", lineHeight: 1.7, whiteSpace: "pre-wrap" as const, fontFamily: "inherit", background: "var(--color-bg)", borderBottom: "0.5px solid var(--color-border)", margin: 0 },
   slackSendBtn: { display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", padding: "8px 12px", border: "none", background: "#4A154B", color: "#fff", cursor: "pointer", fontSize: 12.5, fontWeight: 500, fontFamily: "inherit" },
   sentBadge: { display: "flex", alignItems: "center", justifyContent: "center", gap: 5, padding: "8px 12px", fontSize: 11.5, color: "var(--color-text-tertiary)", background: "var(--color-bg-secondary)" },
+  vendorRequestBtn: { background: "#E8F8EC", color: "#1B7F3A", borderColor: "#A8D9B4", marginTop: 2 },
+  vendorPanelHeader: { background: "#E8F8EC", color: "#1B7F3A" },
+  lineSendBtn: { display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", padding: "8px 12px", border: "none", background: "#06C755", color: "#fff", cursor: "pointer", fontSize: 12.5, fontWeight: 500, fontFamily: "inherit" },
 
   // タイピングアニメーション用（CSSアニメはglobals.cssで定義）
   dot1: { width: 6, height: 6, borderRadius: "50%", background: "var(--color-text-tertiary)", display: "inline-block", animation: "bounce 1.2s infinite", animationDelay: "0s" },
