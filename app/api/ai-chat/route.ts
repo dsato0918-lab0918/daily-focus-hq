@@ -1,11 +1,8 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
-  // APIキーのチェックをリクエスト時に行う（ビルド時ではなく）
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    console.error("AI chat error: GEMINI_API_KEY is not set");
     return NextResponse.json(
       { error: "サーバー設定エラー: APIキーが設定されていません。" },
       { status: 500 }
@@ -15,7 +12,6 @@ export async function POST(req: NextRequest) {
   try {
     const { messages, tasks, projects, domains } = await req.json();
 
-    // タスク・プロジェクトの状況をテキストにまとめる
     const taskSummary = tasks
       .map((t: { title: string; done: boolean; urgent: boolean; due: string; memo: string; projId: string }) => {
         const proj = projects.find((p: { id: string; name: string; domain: string }) => p.id === t.projId);
@@ -47,30 +43,45 @@ ${taskSummary || "（タスクなし）"}
 - 優先度・緊急度・進捗に基づいた実践的なアドバイスをしてください
 - 操作方法の質問にも答えてください`;
 
-    // genAI をリクエスト時に初期化（モジュールレベルではなく）
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash-latest",
-      systemInstruction: systemPrompt,
-    });
-
-    // 会話履歴を Gemini 形式に変換（最後のユーザーメッセージを除く）
-    // Gemini は履歴がユーザーメッセージから始まる必要があるため、先頭のAIメッセージを除去
+    // 会話履歴を構築（先頭のAIメッセージを除去）
     let historyMsgs = messages.slice(0, -1);
     while (historyMsgs.length > 0 && historyMsgs[0].role !== "user") {
       historyMsgs = historyMsgs.slice(1);
     }
-    const history = historyMsgs.map((msg: { role: string; text: string }) => ({
-      role: msg.role === "user" ? "user" : "model",
-      parts: [{ text: msg.text }],
-    }));
+    const contents = [
+      ...historyMsgs.map((msg: { role: string; text: string }) => ({
+        role: msg.role === "user" ? "user" : "model",
+        parts: [{ text: msg.text }],
+      })),
+      { role: "user", parts: [{ text: messages[messages.length - 1].text }] },
+    ];
 
-    const chat = model.startChat({ history });
-    const lastMessage = messages[messages.length - 1].text;
-    const result = await chat.sendMessage(lastMessage);
-    const text = result.response.text();
+    // SDK を使わず v1 REST API を直接呼び出す
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemPrompt }] },
+          contents,
+        }),
+      }
+    );
 
+    if (!res.ok) {
+      const errBody = await res.text();
+      console.error("Gemini API error:", errBody);
+      return NextResponse.json(
+        { error: `[DEBUG] ${res.status} ${errBody.slice(0, 300)}` },
+        { status: 500 }
+      );
+    }
+
+    const data = await res.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "応答を取得できませんでした。";
     return NextResponse.json({ text });
+
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
     console.error("AI chat error:", errMsg);
