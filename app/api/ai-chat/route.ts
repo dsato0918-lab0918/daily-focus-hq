@@ -45,7 +45,12 @@ ${taskSummary || "（タスクなし）"}
     });
 
     // 会話履歴を Gemini 形式に変換（最後のユーザーメッセージを除く）
-    const history = messages.slice(0, -1).map((msg: { role: string; text: string }) => ({
+    // Gemini は履歴がユーザーメッセージから始まる必要があるため、先頭のAIメッセージを除去
+    let historyMsgs = messages.slice(0, -1);
+    while (historyMsgs.length > 0 && historyMsgs[0].role !== "user") {
+      historyMsgs = historyMsgs.slice(1);
+    }
+    const history = historyMsgs.map((msg: { role: string; text: string }) => ({
       role: msg.role === "user" ? "user" : "model",
       parts: [{ text: msg.text }],
     }));
