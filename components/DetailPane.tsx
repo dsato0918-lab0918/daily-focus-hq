@@ -52,7 +52,7 @@ export default function DetailPane({ task, project, onMemoChange, onUpdateTask, 
   const [titleValue, setTitleValue] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { if (editingTitle) titleRef.current?.focus(); }, [editingTitle]);
@@ -170,13 +170,23 @@ export default function DetailPane({ task, project, onMemoChange, onUpdateTask, 
         </div>
 
         <div style={styles.inputRow}>
-          <input
+          <textarea
             ref={inputRef}
             style={styles.chatInput}
-            placeholder="メッセージを入力..."
+            placeholder="メッセージを入力... (Enter で送信 / Shift+Enter で改行)"
             value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+            rows={1}
+            onChange={(e) => {
+              setInput(e.target.value);
+              e.target.style.height = "auto";
+              e.target.style.height = Math.min(e.target.scrollHeight, 100) + "px";
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                sendMessage();
+              }
+            }}
           />
           <button
             style={{ ...styles.sendBtn, opacity: input.trim() && !thinking ? 1 : 0.4 }}
@@ -283,7 +293,7 @@ const styles: Record<string, React.CSSProperties> = {
   userBubble: { maxWidth: "85%", padding: "7px 10px", borderRadius: "12px 12px 2px 12px", background: "var(--color-info-bg)", color: "var(--color-info-text)", fontSize: 12, lineHeight: 1.5 },
   aiBubble: { maxWidth: "85%", padding: "7px 10px", borderRadius: "12px 12px 12px 2px", background: "var(--color-bg-secondary)", color: "var(--color-text-primary)", fontSize: 12, lineHeight: 1.5, border: "0.5px solid var(--color-border)", display: "flex", gap: 4, alignItems: "center" },
   inputRow: { display: "flex", gap: 6, padding: "8px 10px", borderTop: "0.5px solid var(--color-border)", flexShrink: 0 },
-  chatInput: { flex: 1, padding: "6px 10px", fontSize: 12, border: "0.5px solid var(--color-border-mid)", borderRadius: 8, background: "var(--color-bg)", color: "var(--color-text-primary)", outline: "none", fontFamily: "inherit" },
+  chatInput: { flex: 1, padding: "6px 10px", fontSize: 12, border: "0.5px solid var(--color-border-mid)", borderRadius: 8, background: "var(--color-bg)", color: "var(--color-text-primary)", outline: "none", fontFamily: "inherit", resize: "none" as const, lineHeight: 1.5, minHeight: 30, maxHeight: 100, overflowY: "auto" as const },
   sendBtn: { width: 32, height: 32, border: "none", borderRadius: 8, background: "var(--color-info-bg)", color: "var(--color-info-text)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 },
 
   // タイピングアニメーション用（CSSアニメはglobals.cssで定義）

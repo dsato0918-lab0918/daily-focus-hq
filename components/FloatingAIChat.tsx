@@ -20,7 +20,7 @@ export default function FloatingAIChat({ tasks, projects, domains }: Props) {
   const [input, setInput] = useState("");
   const [thinking, setThinking] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // パネルを開いたとき最初の挨拶を表示
   useEffect(() => {
@@ -140,14 +140,24 @@ export default function FloatingAIChat({ tasks, projects, domains }: Props) {
 
           {/* 入力エリア */}
           <div style={s.inputRow}>
-            <input
+            <textarea
               ref={inputRef}
               style={s.chatInput}
-              placeholder="何でも聞いてください..."
+              placeholder="何でも聞いてください... (Enter で送信 / Shift+Enter で改行)"
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              rows={1}
+              onChange={(e) => {
+                setInput(e.target.value);
+                // 高さを内容に合わせて自動調整
+                e.target.style.height = "auto";
+                e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
+              }}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+                // IME変換中（日本語入力の変換確定）は送信しない
+                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  sendMessage();
+                }
               }}
             />
             <button
@@ -311,6 +321,11 @@ const s: Record<string, React.CSSProperties> = {
     color: "var(--color-text-primary)",
     outline: "none",
     fontFamily: "inherit",
+    resize: "none" as const,
+    lineHeight: 1.5,
+    minHeight: 34,
+    maxHeight: 120,
+    overflowY: "auto" as const,
   },
   sendBtn: {
     width: 34,
