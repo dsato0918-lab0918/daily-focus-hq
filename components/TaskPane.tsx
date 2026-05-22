@@ -44,13 +44,12 @@ const RANK_STYLES = [
   { bg: "var(--color-mgmt-bg)",  color: "var(--color-mgmt-text)", label: "#3" },
 ];
 
-type SortKey = "default" | "due" | "urgent" | "done";
+type SortKey = "default" | "due" | "urgent";
 
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "default", label: "登録順" },
   { key: "due",     label: "期限順" },
   { key: "urgent",  label: "急ぎ優先" },
-  { key: "done",    label: "未完了優先" },
 ];
 
 function parseDue(due: string): number {
