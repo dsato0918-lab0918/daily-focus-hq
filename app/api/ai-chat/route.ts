@@ -65,15 +65,9 @@ ${taskSummary || "（タスクなし）"}
       { role: "user", parts: [{ text: lastUserText }] },
     ];
 
-    // [DEBUG] 利用可能なモデル一覧を返す
-    const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}&pageSize=50`);
-    const listData = await listRes.json();
-    const modelNames = (listData.models || []).map((m: {name: string}) => m.name).join(", ");
-    return NextResponse.json({ text: `利用可能モデル: ${modelNames}` });
-
-    // v1 REST API を直接呼び出す
+    // v1beta REST API を直接呼び出す
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -85,7 +79,7 @@ ${taskSummary || "（タスクなし）"}
       const errBody = await res.text();
       console.error("Gemini API error:", errBody);
       return NextResponse.json(
-        { error: `[DEBUG] ${res.status} ${errBody.slice(0, 300)}` },
+        { error: `AIエラー: ${res.status}` },
         { status: 500 }
       );
     }
@@ -98,7 +92,7 @@ ${taskSummary || "（タスクなし）"}
     const errMsg = error instanceof Error ? error.message : String(error);
     console.error("AI chat error:", errMsg);
     return NextResponse.json(
-      { error: `[DEBUG] ${errMsg}` },
+      { error: `AIエラー: ${errMsg}` },
       { status: 500 }
     );
   }
