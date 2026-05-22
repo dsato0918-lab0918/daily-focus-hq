@@ -47,7 +47,7 @@ export default function DomainPane({ domains, tasks, projects, curDomain, onSele
 
   return (
     <aside style={s.pane}>
-      <div style={s.header}>大分野</div>
+      <div style={s.header}>セクション</div>
 
       {/* 全体俯瞰（固定） */}
       <div
@@ -122,7 +122,7 @@ export default function DomainPane({ domains, tasks, projects, curDomain, onSele
       {/* 追加フォーム */}
       {adding ? (
         <div style={s.addForm}>
-          <input ref={addRef} style={s.input} placeholder="大分野名..." value={addName} onChange={(e) => setAddName(e.target.value)}
+          <input ref={addRef} style={s.input} placeholder="セクション名..." value={addName} onChange={(e) => setAddName(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") confirmAdd(); if (e.key === "Escape") { setAdding(false); setAddName(""); } }} />
           <div style={s.formActions}>
             <button style={s.confirmBtn} onClick={confirmAdd}>追加</button>
@@ -131,7 +131,7 @@ export default function DomainPane({ domains, tasks, projects, curDomain, onSele
         </div>
       ) : (
         <button style={s.addBtn} onClick={() => setAdding(true)}>
-          <i className="ti ti-plus" aria-hidden="true" /> 大分野を追加
+          <i className="ti ti-plus" aria-hidden="true" /> セクションを追加
         </button>
       )}
     </aside>
