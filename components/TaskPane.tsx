@@ -251,7 +251,9 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
   };
 
   const renderFocusCards = () => {
-    const top3 = scoredFocus(visibleTasks);
+    // 今日のフォーカスは常に未完了タスクのみを対象とする（showDone の状態に依存しない）
+    const undoneTasks = visibleTasks.filter((t) => !t.done);
+    const top3 = scoredFocus(undoneTasks);
     if (!top3.length) return <div style={styles.empty}>対象タスクがありません</div>;
     return top3.map((task, i) => {
       const proj = projMap.get(task.projId);
