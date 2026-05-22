@@ -100,6 +100,11 @@ textarea {
 .desktop-layout { display: grid; }
 .mobile-layout  { display: none; }
 
+/* クイック追加FAB/パネルはデフォルト非表示（モバイルメディアクエリで上書き） */
+.mobile-fab-quickadd { display: none; }
+.mobile-qa-backdrop  { display: none; }
+.mobile-qa-panel     { display: none; }
+
 /* モバイル (< 768px): デスクトップを隠してモバイルUIを表示 */
 @media (max-width: 767px) {
   html, body {
@@ -187,4 +192,128 @@ textarea {
   .floating-ai-wrapper {
     bottom: 72px !important;
   }
+
+  /* ── クイック追加FAB (AIの上) ── */
+  .mobile-fab-quickadd {
+    display: flex;
+    position: fixed;
+    bottom: 136px; /* AIのFABより上 */
+    right: 24px;
+    z-index: 999;
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    border: none;
+    background: var(--color-success-bg);
+    color: var(--color-success-text);
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.16), 0 1px 4px rgba(0,0,0,0.08);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .mobile-fab-quickadd:active {
+    transform: scale(0.92);
+  }
+
+  /* ── クイック追加バックドロップ ── */
+  .mobile-qa-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    background: rgba(0,0,0,0.35);
+    backdrop-filter: blur(2px);
+  }
+
+  /* ── クイック追加ボトムシート ── */
+  .mobile-qa-panel {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1101;
+    background: var(--color-bg);
+    border-radius: 18px 18px 0 0;
+    padding: 12px 20px 32px;
+    padding-bottom: calc(32px + env(safe-area-inset-bottom));
+    box-shadow: 0 -4px 24px rgba(0,0,0,0.12);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    animation: slideUp 0.22s ease;
+  }
+
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+  }
+
+  .mobile-qa-handle {
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--color-bg-tertiary);
+    align-self: center;
+    margin-bottom: 4px;
+  }
+
+  .mobile-qa-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin-bottom: 2px;
+  }
+
+  .mobile-qa-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 0.5px solid var(--color-border-mid);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-secondary);
+    color: var(--color-text-primary);
+    font-family: inherit;
+    font-size: 14px;
+    outline: none;
+    appearance: none;
+  }
+  .mobile-qa-input:focus {
+    border-color: var(--color-info-text);
+  }
+
+  .mobile-qa-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 2px;
+  }
+
+  .mobile-qa-cancel {
+    flex: 1;
+    padding: 11px 0;
+    border: 0.5px solid var(--color-border-mid);
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--color-text-secondary);
+    font-family: inherit;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  .mobile-qa-confirm {
+    flex: 2;
+    padding: 11px 0;
+    border: none;
+    border-radius: var(--radius-md);
+    background: var(--color-info-bg);
+    color: var(--color-info-text);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .mobile-qa-confirm:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
 }
+

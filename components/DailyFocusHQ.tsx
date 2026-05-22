@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { initialDomains, initialProjects, initialTasks, DOMAIN_COLOR_PRESETS, DOMAIN_ICONS } from "@/lib/data";
 import type { Domain, DomainKey, Project, Task } from "@/lib/types";
 import DomainPane from "./DomainPane";
@@ -32,6 +32,13 @@ export default function DailyFocusHQ() {
   // モバイルのアクティブペイン
   const [activeMobilePane, setActiveMobilePane] = useState<MobilePane>("tasks");
 
+  // クイックタスク追加（モバイル専用）
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [qaTitle, setQaTitle]   = useState("");
+  const [qaProjId, setQaProjId] = useState<string>("");
+  const [qaDue, setQaDue]       = useState("");
+  const qaInputRef = useRef<HTMLInputElement>(null);
+
   const projMap = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
   const selTask = useMemo(() => tasks.find((t) => t.id === selTaskId) ?? null, [tasks, selTaskId]);
   const selProject = useMemo(() => (selTask ? projMap.get(selTask.projId) ?? null : null), [selTask, projMap]);
@@ -39,7 +46,7 @@ export default function DailyFocusHQ() {
   // ── 選択系 ────────────────────────────────────────────────────
   const handleSelectDomain = useCallback((domain: DomainKey) => {
     setCurDomain(domain); setCurProjId(null); setSelTaskId(null);
-    if (isMobileWidth()) setActiveMobilePane("tasks");
+    // モバイルではナビペインに留まる（セクション選択後にプロジェクトを絞り込む）
   }, []);
 
   const handleSelectProj = useCallback((projId: string | null) => {
@@ -73,6 +80,23 @@ export default function DailyFocusHQ() {
     setSelTaskId((cur) => (cur === id ? null : cur));
     if (isMobileWidth()) setActiveMobilePane("tasks");
   }, []);
+
+  // ── クイック追加（モバイル専用） ──────────────────────────────
+  useEffect(() => {
+    if (showQuickAdd) {
+      const firstProj = projects[0];
+      setQaProjId(firstProj?.id ?? "");
+      setQaDue("");
+      setQaTitle("");
+      setTimeout(() => qaInputRef.current?.focus(), 100);
+    }
+  }, [showQuickAdd]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleQuickAddConfirm = useCallback(() => {
+    if (!qaTitle.trim() || !qaProjId) return;
+    handleAddTask(qaTitle.trim(), qaProjId, qaDue, false);
+    setShowQuickAdd(false);
+  }, [qaTitle, qaProjId, qaDue, handleAddTask]);
 
   // ── プロジェクト操作 ──────────────────────────────────────────
   const handleAddProject = useCallback((name: string, domain: DomainKey) => {
@@ -190,6 +214,75 @@ export default function DailyFocusHQ() {
       </div>
 
       <FloatingAIChat tasks={tasks} projects={projects} domains={domains} />
+
+      {/* ════════════════════════════════════════
+          モバイル専用: クイックタスク追加FAB＋ボトムシート
+      ════════════════════════════════════════ */}
+      <button
+        className="mobile-fab-quickadd"
+        onClick={() => setShowQuickAdd(true)}
+        aria-label="タスクを追加"
+        title="タスクを追加"
+      >
+        <i className="ti ti-plus" style={{ fontSize: 22 }} aria-hidden="true" />
+      </button>
+
+      {showQuickAdd && (
+        <>
+          {/* バックドロップ */}
+          <div
+            className="mobile-qa-backdrop"
+            onClick={() => setShowQuickAdd(false)}
+          />
+          {/* ボトムシート */}
+          <div className="mobile-qa-panel">
+            <div className="mobile-qa-handle" />
+            <div className="mobile-qa-title">タスクを追加</div>
+
+            <input
+              ref={qaInputRef}
+              className="mobile-qa-input"
+              placeholder="タスク名を入力..."
+              value={qaTitle}
+              onChange={(e) => setQaTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.nativeEvent.isComposing) handleQuickAddConfirm();
+                if (e.key === "Escape") setShowQuickAdd(false);
+              }}
+            />
+
+            <select
+              className="mobile-qa-input"
+              value={qaProjId}
+              onChange={(e) => setQaProjId(e.target.value)}
+            >
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+
+            <input
+              className="mobile-qa-input"
+              type="date"
+              value={qaDue}
+              onChange={(e) => setQaDue(e.target.value)}
+            />
+
+            <div className="mobile-qa-actions">
+              <button className="mobile-qa-cancel" onClick={() => setShowQuickAdd(false)}>
+                キャンセル
+              </button>
+              <button
+                className="mobile-qa-confirm"
+                onClick={handleQuickAddConfirm}
+                disabled={!qaTitle.trim() || !qaProjId}
+              >
+                追加
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 }
