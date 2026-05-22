@@ -50,7 +50,7 @@ ${taskSummary || "（タスクなし）"}
     // genAI をリクエスト時に初期化（モジュールレベルではなく）
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash",
+      model: "gemini-1.5-flash",
       systemInstruction: systemPrompt,
     });
 
@@ -74,9 +74,8 @@ ${taskSummary || "（タスクなし）"}
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
     console.error("AI chat error:", errMsg);
-    // デバッグ用：実際のエラーメッセージを返す（確認後に元に戻す）
     return NextResponse.json(
-      { error: `[DEBUG] ${errMsg}` },
+      { error: "AIの応答に失敗しました。しばらく待ってから再試行してください。" },
       { status: 500 }
     );
   }
