@@ -1,9 +1,17 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextRequest, NextResponse } from "next/server";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-
 export async function POST(req: NextRequest) {
+  // APIキーのチェックをリクエスト時に行う（ビルド時ではなく）
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    console.error("AI chat error: GEMINI_API_KEY is not set");
+    return NextResponse.json(
+      { error: "サーバー設定エラー: APIキーが設定されていません。" },
+      { status: 500 }
+    );
+  }
+
   try {
     const { messages, tasks, projects, domains } = await req.json();
 
@@ -39,8 +47,10 @@ ${taskSummary || "（タスクなし）"}
 - 優先度・緊急度・進捗に基づいた実践的なアドバイスをしてください
 - 操作方法の質問にも答えてください`;
 
+    // genAI をリクエスト時に初期化（モジュールレベルではなく）
+    const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.0-flash",
       systemInstruction: systemPrompt,
     });
 
@@ -62,7 +72,8 @@ ${taskSummary || "（タスクなし）"}
 
     return NextResponse.json({ text });
   } catch (error) {
-    console.error("AI chat error:", error);
+    const errMsg = error instanceof Error ? error.message : String(error);
+    console.error("AI chat error:", errMsg);
     return NextResponse.json(
       { error: "AIの応答に失敗しました。しばらく待ってから再試行してください。" },
       { status: 500 }
