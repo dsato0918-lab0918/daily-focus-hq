@@ -1,5 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function callGemini(url: string, body: string): Promise<Response> {
+  // 429 が返ってきたら最大2回リトライ（2秒 → 4秒待機）
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+    if (res.status !== 429 || attempt === 2) return res;
+    await sleep(2000 * (attempt + 1));
+  }
+  throw new Error("unreachable");
+}
+
 export async function POST(req: NextRequest) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -65,21 +81,22 @@ ${taskSummary || "（タスクなし）"}
       { role: "user", parts: [{ text: lastUserText }] },
     ];
 
-    // v1beta REST API を直接呼び出す
-    const res = await fetch(
+    const res = await callGemini(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents }),
-      }
+      JSON.stringify({ contents })
     );
 
     if (!res.ok) {
       const errBody = await res.text();
       console.error("Gemini API error:", errBody);
+      if (res.status === 429) {
+        return NextResponse.json(
+          { error: "AIが混み合っています。少し待ってから再度お試しください。" },
+          { status: 500 }
+        );
+      }
       return NextResponse.json(
-        { error: `AIエラー: ${res.status}` },
+        { error: `AI接続エラーが発生しました（${res.status}）。` },
         { status: 500 }
       );
     }
@@ -92,7 +109,7 @@ ${taskSummary || "（タスクなし）"}
     const errMsg = error instanceof Error ? error.message : String(error);
     console.error("AI chat error:", errMsg);
     return NextResponse.json(
-      { error: `AIエラー: ${errMsg}` },
+      { error: "AIとの通信中にエラーが発生しました。" },
       { status: 500 }
     );
   }
