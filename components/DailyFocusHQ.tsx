@@ -9,6 +9,17 @@ import TaskPane from "./TaskPane";
 import DetailPane from "./DetailPane";
 import FloatingAIChat from "./FloatingAIChat";
 
+type MobilePane = "nav" | "tasks" | "detail";
+
+const MOBILE_NAV_ITEMS = [
+  { key: "nav"    as MobilePane, icon: "ti-layout-grid", label: "ナビ"   },
+  { key: "tasks"  as MobilePane, icon: "ti-checkbox",    label: "タスク" },
+  { key: "detail" as MobilePane, icon: "ti-file-text",   label: "詳細"   },
+];
+
+const isMobileWidth = () =>
+  typeof window !== "undefined" && window.innerWidth < 768;
+
 export default function DailyFocusHQ() {
   const [domains, setDomains] = useState<Domain[]>(initialDomains);
   const [projects, setProjects] = useState<Project[]>(initialProjects);
@@ -18,6 +29,9 @@ export default function DailyFocusHQ() {
   const [curProjId, setCurProjId] = useState<string | null>(null);
   const [selTaskId, setSelTaskId] = useState<string | null>(null);
 
+  // モバイルのアクティブペイン
+  const [activeMobilePane, setActiveMobilePane] = useState<MobilePane>("tasks");
+
   const projMap = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
   const selTask = useMemo(() => tasks.find((t) => t.id === selTaskId) ?? null, [tasks, selTaskId]);
   const selProject = useMemo(() => (selTask ? projMap.get(selTask.projId) ?? null : null), [selTask, projMap]);
@@ -25,11 +39,18 @@ export default function DailyFocusHQ() {
   // ── 選択系 ────────────────────────────────────────────────────
   const handleSelectDomain = useCallback((domain: DomainKey) => {
     setCurDomain(domain); setCurProjId(null); setSelTaskId(null);
+    if (isMobileWidth()) setActiveMobilePane("tasks");
   }, []);
+
   const handleSelectProj = useCallback((projId: string | null) => {
     setCurProjId(projId); setSelTaskId(null);
+    if (projId && isMobileWidth()) setActiveMobilePane("tasks");
   }, []);
-  const handleSelectTask = useCallback((id: string) => setSelTaskId(id), []);
+
+  const handleSelectTask = useCallback((id: string) => {
+    setSelTaskId(id);
+    if (isMobileWidth()) setActiveMobilePane("detail");
+  }, []);
 
   // ── タスク操作 ────────────────────────────────────────────────
   const handleToggleDone = useCallback((id: string) => {
@@ -42,6 +63,7 @@ export default function DailyFocusHQ() {
     const newTask: Task = { id: `task_${Date.now()}`, projId, title, due, urgent, done: false, memo: "" };
     setTasks((prev) => [...prev, newTask]);
     setSelTaskId(newTask.id);
+    if (isMobileWidth()) setActiveMobilePane("detail");
   }, []);
   const handleUpdateTask = useCallback((id: string, updates: Partial<Task>) => {
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)));
@@ -49,6 +71,7 @@ export default function DailyFocusHQ() {
   const handleDeleteTask = useCallback((id: string) => {
     setTasks((prev) => prev.filter((t) => t.id !== id));
     setSelTaskId((cur) => (cur === id ? null : cur));
+    if (isMobileWidth()) setActiveMobilePane("tasks");
   }, []);
 
   // ── プロジェクト操作 ──────────────────────────────────────────
@@ -65,7 +88,7 @@ export default function DailyFocusHQ() {
     setSelTaskId(null);
   }, []);
 
-  // ── 大分野操作 ────────────────────────────────────────────────
+  // ── セクション操作 ────────────────────────────────────────────
   const handleAddDomain = useCallback((name: string) => {
     setDomains((prev) => {
       const preset = DOMAIN_COLOR_PRESETS[prev.length % DOMAIN_COLOR_PRESETS.length];
@@ -86,46 +109,92 @@ export default function DailyFocusHQ() {
     setSelTaskId(null);
   }, [projects]);
 
+  // ── 共通 props ───────────────────────────────────────────────
+  const domainProps = {
+    domains, tasks, projects, curDomain,
+    onSelect: handleSelectDomain,
+    onAddDomain: handleAddDomain,
+    onUpdateDomain: handleUpdateDomain,
+    onDeleteDomain: handleDeleteDomain,
+  };
+  const projectProps = {
+    domains, projects, curDomain, curProjId,
+    onSelect: handleSelectProj,
+    onAddProject: handleAddProject,
+    onUpdateProject: handleUpdateProject,
+    onDeleteProject: handleDeleteProject,
+  };
+  const taskProps = {
+    tasks, projects, domains, curDomain, curProjId, selTaskId,
+    onSelectTask: handleSelectTask,
+    onToggleDone: handleToggleDone,
+    onAddTask: handleAddTask,
+    onDeleteTask: handleDeleteTask,
+  };
+  const detailProps = {
+    task: selTask, project: selProject,
+    onMemoChange: handleMemoChange,
+    onUpdateTask: handleUpdateTask,
+    onDeleteTask: handleDeleteTask,
+  };
+
   return (
-    <div style={styles.container}>
-      <DomainPane
-        domains={domains} tasks={tasks} projects={projects}
-        curDomain={curDomain}
-        onSelect={handleSelectDomain}
-        onAddDomain={handleAddDomain}
-        onUpdateDomain={handleUpdateDomain}
-        onDeleteDomain={handleDeleteDomain}
-      />
-      <ProjectPane
-        domains={domains} projects={projects}
-        curDomain={curDomain} curProjId={curProjId}
-        onSelect={handleSelectProj}
-        onAddProject={handleAddProject}
-        onUpdateProject={handleUpdateProject}
-        onDeleteProject={handleDeleteProject}
-      />
-      <TaskPane
-        tasks={tasks} projects={projects} domains={domains}
-        curDomain={curDomain} curProjId={curProjId} selTaskId={selTaskId}
-        onSelectTask={handleSelectTask}
-        onToggleDone={handleToggleDone}
-        onAddTask={handleAddTask}
-        onDeleteTask={handleDeleteTask}
-      />
-      <DetailPane
-        task={selTask} project={selProject}
-        onMemoChange={handleMemoChange}
-        onUpdateTask={handleUpdateTask}
-        onDeleteTask={handleDeleteTask}
-      />
+    <>
+      {/* ════════════════════════════════════════
+          デスクトップレイアウト（変更なし）
+          CSS: .desktop-layout → 768px以下で display:none
+      ════════════════════════════════════════ */}
+      <div className="desktop-layout" style={styles.desktopContainer}>
+        <DomainPane  {...domainProps}  />
+        <ProjectPane {...projectProps} />
+        <TaskPane    {...taskProps}    />
+        <DetailPane  {...detailProps}  />
+      </div>
+
+      {/* ════════════════════════════════════════
+          モバイルレイアウト（768px以下で表示）
+          CSS: .mobile-layout → 768px以上で display:none
+      ════════════════════════════════════════ */}
+      <div className="mobile-layout">
+
+        {/* メインコンテンツエリア */}
+        <div className="mobile-content">
+          {activeMobilePane === "nav" && (
+            <div className="mobile-nav-pane">
+              <div className="mobile-nav-domain">
+                <DomainPane {...domainProps} />
+              </div>
+              <div className="mobile-nav-project">
+                <ProjectPane {...projectProps} />
+              </div>
+            </div>
+          )}
+          {activeMobilePane === "tasks" && <TaskPane {...taskProps} />}
+          {activeMobilePane === "detail" && <DetailPane {...detailProps} />}
+        </div>
+
+        {/* ボトムナビゲーション */}
+        <nav className="mobile-bottom-nav">
+          {MOBILE_NAV_ITEMS.map(({ key, icon, label }) => (
+            <button
+              key={key}
+              className={`mobile-nav-btn${activeMobilePane === key ? " active" : ""}`}
+              onClick={() => setActiveMobilePane(key)}
+            >
+              <i className={`ti ${icon}`} aria-hidden="true" />
+              <span>{label}</span>
+            </button>
+          ))}
+        </nav>
+      </div>
+
       <FloatingAIChat tasks={tasks} projects={projects} domains={domains} />
-    </div>
+    </>
   );
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  container: {
-    display: "grid",
+  desktopContainer: {
     gridTemplateColumns: "180px 200px minmax(0, 1fr) 260px",
     height: "100vh",
     width: "100vw",

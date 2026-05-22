@@ -75,7 +75,7 @@ export default function FloatingAIChat({ tasks, projects, domains }: Props) {
   };
 
   return (
-    <div style={s.wrapper}>
+    <div className="floating-ai-wrapper" style={s.wrapper}>
 
       {/* ── チャットパネル ── */}
       {open && (
