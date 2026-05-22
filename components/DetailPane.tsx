@@ -387,9 +387,9 @@ const styles: Record<string, React.CSSProperties> = {
   sendBtn: { width: 32, height: 32, border: "none", borderRadius: 8, background: "var(--color-info-bg)", color: "var(--color-info-text)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 },
 
   // スタッフへ依頼
-  staffRequestBtn: { display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", border: "0.5px solid var(--color-border-mid)", borderRadius: 8, background: "var(--color-bg-secondary)", color: "var(--color-text-primary)", cursor: "pointer", fontSize: 12.5, fontWeight: 500, fontFamily: "inherit", width: "100%", marginBottom: 10 },
+  staffRequestBtn: { display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", border: "0.5px solid #C9A8CB", borderRadius: 8, background: "#F4ECF5", color: "#4A154B", cursor: "pointer", fontSize: 12.5, fontWeight: 500, fontFamily: "inherit", width: "100%", marginBottom: 10 },
   staffPanel: { border: "0.5px solid var(--color-border-mid)", borderRadius: 10, overflow: "hidden", marginBottom: 12 },
-  staffPanelHeader: { display: "flex", alignItems: "center", gap: 6, padding: "8px 10px", background: "var(--color-bg-secondary)", borderBottom: "0.5px solid var(--color-border)", fontSize: 11.5, fontWeight: 500, color: "var(--color-text-primary)" },
+  staffPanelHeader: { display: "flex", alignItems: "center", gap: 6, padding: "8px 10px", background: "#F4ECF5", borderBottom: "0.5px solid #C9A8CB", fontSize: 11.5, fontWeight: 500, color: "#4A154B" },
   staffPanelClose: { marginLeft: "auto", width: 22, height: 22, border: "none", borderRadius: 4, background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "var(--color-text-tertiary)", padding: 0 },
   draftText: { padding: "10px 12px", fontSize: 11.5, color: "var(--color-text-secondary)", lineHeight: 1.7, whiteSpace: "pre-wrap" as const, fontFamily: "inherit", background: "var(--color-bg)", borderBottom: "0.5px solid var(--color-border)", margin: 0 },
   slackSendBtn: { display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", padding: "8px 12px", border: "none", background: "#4A154B", color: "#fff", cursor: "pointer", fontSize: 12.5, fontWeight: 500, fontFamily: "inherit" },
