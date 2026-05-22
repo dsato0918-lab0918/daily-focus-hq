@@ -74,8 +74,9 @@ ${taskSummary || "（タスクなし）"}
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
     console.error("AI chat error:", errMsg);
+    // デバッグ用：実際のエラーメッセージを返す（確認後に元に戻す）
     return NextResponse.json(
-      { error: "AIの応答に失敗しました。しばらく待ってから再試行してください。" },
+      { error: `[DEBUG] ${errMsg}` },
       { status: 500 }
     );
   }
