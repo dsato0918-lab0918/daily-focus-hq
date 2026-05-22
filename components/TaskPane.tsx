@@ -210,7 +210,7 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") confirmAdd();
+              if (e.key === "Enter" && !e.nativeEvent.isComposing) confirmAdd();
               if (e.key === "Escape") cancelAdd();
             }}
           />
