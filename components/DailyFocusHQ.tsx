@@ -129,6 +129,7 @@ export default function DailyFocusHQ() {
     onSelectTask: handleSelectTask,
     onToggleDone: handleToggleDone,
     onAddTask: handleAddTask,
+    onUpdateTask: handleUpdateTask,
     onDeleteTask: handleDeleteTask,
   };
   const detailProps = {

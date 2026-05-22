@@ -14,6 +14,7 @@ interface Props {
   onSelectTask: (id: string) => void;
   onToggleDone: (id: string) => void;
   onAddTask: (title: string, projId: string, due: string, urgent: boolean) => void;
+  onUpdateTask: (id: string, updates: Partial<Task>) => void;
   onDeleteTask: (id: string) => void;
 }
 
@@ -67,7 +68,7 @@ function sortTasks(tasks: Task[], key: SortKey): Task[] {
   return arr;
 }
 
-export default function TaskPane({ tasks, projects, domains, curDomain, curProjId, selTaskId, onSelectTask, onToggleDone, onAddTask, onDeleteTask }: Props) {
+export default function TaskPane({ tasks, projects, domains, curDomain, curProjId, selTaskId, onSelectTask, onToggleDone, onAddTask, onUpdateTask, onDeleteTask }: Props) {
   const [hoveredTaskId, setHoveredTaskId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortKey>("default");
   const [showDone, setShowDone] = useState(false);
@@ -76,7 +77,19 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
   const [due, setDue] = useState(todayDue());
   const [urgent, setUrgent] = useState(false);
   const [projId, setProjId] = useState<string>("");
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const editRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { if (editingTaskId) editRef.current?.focus(); }, [editingTaskId]);
+
+  const startEdit = (task: Task) => { setEditingTaskId(task.id); setEditingTitle(task.title); };
+  const confirmEdit = (id: string) => {
+    if (editingTitle.trim()) onUpdateTask(id, { title: editingTitle.trim() });
+    setEditingTaskId(null);
+  };
+  const cancelEdit = () => setEditingTaskId(null);
 
   const projMap = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
 
@@ -136,11 +149,12 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
     const domKey = proj?.domain ?? "";
     const domColor = domainColorMap[domKey] ?? { bg: "var(--color-bg-secondary)", color: "var(--color-text-secondary)" };
     const isSelected = selTaskId === task.id;
+    const isEditing = editingTaskId === task.id;
 
     return (
       <div
         key={task.id}
-        onClick={() => onSelectTask(task.id)}
+        onClick={() => !isEditing && onSelectTask(task.id)}
         onMouseEnter={() => setHoveredTaskId(task.id)}
         onMouseLeave={() => setHoveredTaskId(null)}
         style={{ ...styles.taskRow, background: isSelected ? "var(--color-info-bg)" : hoveredTaskId === task.id ? "var(--color-bg-secondary)" : "transparent" }}
@@ -152,24 +166,50 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
         >
           {task.done && <i className="ti ti-check" style={{ fontSize: 10, color: "var(--color-success-text)" }} />}
         </button>
+
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 12.5, color: task.done ? "var(--color-text-tertiary)" : "var(--color-text-primary)", textDecoration: task.done ? "line-through" : "none", lineHeight: 1.4 }}>
-            {task.title}
-          </div>
+          {isEditing ? (
+            <input
+              ref={editRef}
+              style={styles.editInput}
+              value={editingTitle}
+              onChange={(e) => setEditingTitle(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.nativeEvent.isComposing) confirmEdit(task.id);
+                if (e.key === "Escape") cancelEdit();
+              }}
+              onBlur={() => confirmEdit(task.id)}
+            />
+          ) : (
+            <div style={{ fontSize: 12.5, color: task.done ? "var(--color-text-tertiary)" : "var(--color-text-primary)", textDecoration: task.done ? "line-through" : "none", lineHeight: 1.4 }}>
+              {task.title}
+            </div>
+          )}
           <div style={{ display: "flex", gap: 4, marginTop: 3, flexWrap: "wrap" }}>
             {task.urgent && !task.done && <span style={{ ...styles.chip, background: "#FCEBEB", color: "#A32D2D", border: "none" }}>急ぎ</span>}
             <span style={styles.chip}>{task.due}</span>
             {proj && <span style={{ ...styles.chip, background: domColor.bg, color: domColor.color, border: "none" }}>{proj.name}</span>}
           </div>
         </div>
-        {hoveredTaskId === task.id && (
-          <button
-            style={{ width: 22, height: 22, border: "none", borderRadius: 4, background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "var(--color-text-tertiary)", flexShrink: 0 }}
-            onClick={(e) => { e.stopPropagation(); onDeleteTask(task.id); }}
-            title="削除"
-          >
-            <i className="ti ti-trash" />
-          </button>
+
+        {hoveredTaskId === task.id && !isEditing && (
+          <div style={{ display: "flex", gap: 2, flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+            <button
+              style={styles.rowIconBtn}
+              onClick={() => startEdit(task)}
+              title="タイトルを編集"
+            >
+              <i className="ti ti-pencil" />
+            </button>
+            <button
+              style={styles.rowIconBtn}
+              onClick={() => onDeleteTask(task.id)}
+              title="削除"
+            >
+              <i className="ti ti-trash" />
+            </button>
+          </div>
         )}
       </div>
     );
@@ -345,6 +385,8 @@ const styles: Record<string, React.CSSProperties> = {
 
   taskRow: { display: "flex", alignItems: "flex-start", gap: 8, padding: "9px 12px", borderBottom: "0.5px solid var(--color-border)", cursor: "pointer" },
   checkbox: { width: 15, height: 15, borderRadius: 3, border: "1.5px solid", flexShrink: 0, marginTop: 1, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
+  rowIconBtn: { width: 22, height: 22, border: "none", borderRadius: 4, background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "var(--color-text-tertiary)", padding: 0 },
+  editInput: { width: "100%", padding: "2px 6px", fontSize: 12.5, border: "0.5px solid var(--color-border-mid)", borderRadius: 4, background: "var(--color-bg)", color: "var(--color-text-primary)", outline: "none", fontFamily: "inherit", marginBottom: 2 },
   chip: { fontSize: 10, padding: "1px 6px", borderRadius: 4, border: "0.5px solid var(--color-border)", color: "var(--color-text-secondary)", background: "transparent" },
   sectionLabel: { padding: "6px 12px", fontSize: 10, fontWeight: 500, color: "var(--color-text-tertiary)", letterSpacing: "0.06em", textTransform: "uppercase" as const, background: "var(--color-bg-secondary)", borderBottom: "0.5px solid var(--color-border)" },
   progressBar: { height: 3, background: "var(--color-bg-secondary)", borderRadius: 2, margin: "8px 12px" },
