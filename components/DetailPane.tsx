@@ -51,6 +51,8 @@ export default function DetailPane({ task, project, onMemoChange, onUpdateTask, 
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleValue, setTitleValue] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showStaffRequest, setShowStaffRequest] = useState(false);
+  const [requestSent, setRequestSent] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
@@ -68,11 +70,13 @@ export default function DetailPane({ task, project, onMemoChange, onUpdateTask, 
     else { setConfirmDelete(true); setTimeout(() => setConfirmDelete(false), 3000); }
   };
 
-  // タスクが変わったらチャットをリセット
+  // タスクが変わったらチャット・依頼パネルをリセット
   useEffect(() => {
     setChatOpen(false);
     setMessages([]);
     setInput("");
+    setShowStaffRequest(false);
+    setRequestSent(false);
   }, [task?.id]);
 
   useEffect(() => {
@@ -122,6 +126,11 @@ export default function DetailPane({ task, project, onMemoChange, onUpdateTask, 
   const domKey = project?.domain ?? "design";
   const domColor = DOMAIN_COLORS[domKey] ?? DOMAIN_COLORS.design;
   const domLabel = DOMAIN_LABELS[domKey] ?? "";
+
+  // スタッフへの依頼定型文
+  const staffRequestDraft = task
+    ? `【タスク依頼】\nプロジェクト：${project?.name ?? "未設定"}\nタスク：${task.title}\n期限：${task.due}${task.urgent ? "（急ぎ）" : ""}\n${task.memo ? `\nメモ：\n${task.memo}\n` : ""}\n対応をお願いします。`
+    : "";
 
   // ── チャットビュー ──────────────────────────────────────────────
   if (chatOpen) {
@@ -266,6 +275,43 @@ export default function DetailPane({ task, project, onMemoChange, onUpdateTask, 
           onChange={(e) => onMemoChange(task.id, e.target.value)}
         />
 
+        {/* ── スタッフへ依頼 ── */}
+        <div style={styles.fieldLabel}>アクション</div>
+        <button
+          style={styles.staffRequestBtn}
+          onClick={() => { setShowStaffRequest(true); setRequestSent(false); }}
+        >
+          <i className="ti ti-send" style={{ fontSize: 13 }} aria-hidden="true" />
+          スタッフへ依頼
+        </button>
+
+        {/* 依頼プレビューパネル */}
+        {showStaffRequest && (
+          <div style={styles.staffPanel}>
+            <div style={styles.staffPanelHeader}>
+              <i className="ti ti-brand-slack" style={{ fontSize: 13 }} aria-hidden="true" />
+              <span>Slack 送信プレビュー</span>
+              <button style={styles.staffPanelClose} onClick={() => setShowStaffRequest(false)}>
+                <i className="ti ti-x" />
+              </button>
+            </div>
+            <pre style={styles.draftText}>{staffRequestDraft}</pre>
+            {requestSent ? (
+              <div style={styles.sentBadge}>
+                <i className="ti ti-clock" style={{ fontSize: 11 }} /> Slack連携後に送信できます
+              </div>
+            ) : (
+              <button
+                style={styles.slackSendBtn}
+                onClick={() => setRequestSent(true)}
+              >
+                <i className="ti ti-brand-slack" style={{ fontSize: 13 }} />
+                Slackに送信する
+              </button>
+            )}
+          </div>
+        )}
+
       </div>
     </div>
   );
@@ -295,6 +341,15 @@ const styles: Record<string, React.CSSProperties> = {
   inputRow: { display: "flex", gap: 6, padding: "8px 10px", borderTop: "0.5px solid var(--color-border)", flexShrink: 0 },
   chatInput: { flex: 1, padding: "6px 10px", fontSize: 12, border: "0.5px solid var(--color-border-mid)", borderRadius: 8, background: "var(--color-bg)", color: "var(--color-text-primary)", outline: "none", fontFamily: "inherit", resize: "none" as const, lineHeight: 1.5, minHeight: 30, maxHeight: 100, overflowY: "auto" as const },
   sendBtn: { width: 32, height: 32, border: "none", borderRadius: 8, background: "var(--color-info-bg)", color: "var(--color-info-text)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 },
+
+  // スタッフへ依頼
+  staffRequestBtn: { display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", border: "0.5px solid var(--color-border-mid)", borderRadius: 8, background: "var(--color-bg-secondary)", color: "var(--color-text-primary)", cursor: "pointer", fontSize: 12.5, fontWeight: 500, fontFamily: "inherit", width: "100%", marginBottom: 10 },
+  staffPanel: { border: "0.5px solid var(--color-border-mid)", borderRadius: 10, overflow: "hidden", marginBottom: 12 },
+  staffPanelHeader: { display: "flex", alignItems: "center", gap: 6, padding: "8px 10px", background: "var(--color-bg-secondary)", borderBottom: "0.5px solid var(--color-border)", fontSize: 11.5, fontWeight: 500, color: "var(--color-text-primary)" },
+  staffPanelClose: { marginLeft: "auto", width: 22, height: 22, border: "none", borderRadius: 4, background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "var(--color-text-tertiary)", padding: 0 },
+  draftText: { padding: "10px 12px", fontSize: 11.5, color: "var(--color-text-secondary)", lineHeight: 1.7, whiteSpace: "pre-wrap" as const, fontFamily: "inherit", background: "var(--color-bg)", borderBottom: "0.5px solid var(--color-border)", margin: 0 },
+  slackSendBtn: { display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", padding: "8px 12px", border: "none", background: "#4A154B", color: "#fff", cursor: "pointer", fontSize: 12.5, fontWeight: 500, fontFamily: "inherit" },
+  sentBadge: { display: "flex", alignItems: "center", justifyContent: "center", gap: 5, padding: "8px 12px", fontSize: 11.5, color: "var(--color-text-tertiary)", background: "var(--color-bg-secondary)" },
 
   // タイピングアニメーション用（CSSアニメはglobals.cssで定義）
   dot1: { width: 6, height: 6, borderRadius: "50%", background: "var(--color-text-tertiary)", display: "inline-block", animation: "bounce 1.2s infinite", animationDelay: "0s" },
