@@ -265,13 +265,19 @@ export default function DetailPane({ task, project, onMemoChange, onUpdateTask, 
             {task.urgent ? "急ぎ ✕" : "+ 急ぎ"}
           </button>
           {task.staffRequested && (
-            <span style={{ ...styles.chip, background: "#F4ECF5", color: "#4A154B", border: "0.5px solid #C9A8CB" }}>
-              <i className="ti ti-brand-slack" style={{ fontSize: 9, marginRight: 2 }} />スタッフ依頼済
+            <span style={{ ...styles.chip, background: "#F4ECF5", color: "#4A154B", border: "0.5px solid #C9A8CB", display: "inline-flex", alignItems: "center", gap: 3 }}>
+              <i className="ti ti-brand-slack" style={{ fontSize: 9 }} />スタッフ依頼済
+              <button onClick={() => onUpdateTask(task.id, { staffRequested: false })} style={styles.tagRemoveBtn} title="タグを削除">
+                <i className="ti ti-x" style={{ fontSize: 8 }} />
+              </button>
             </span>
           )}
           {task.vendorRequested && (
-            <span style={{ ...styles.chip, background: "#E8F8EC", color: "#1B7F3A", border: "0.5px solid #A8D9B4" }}>
-              <i className="ti ti-brand-line" style={{ fontSize: 9, marginRight: 2 }} />業者依頼済
+            <span style={{ ...styles.chip, background: "#E8F8EC", color: "#1B7F3A", border: "0.5px solid #A8D9B4", display: "inline-flex", alignItems: "center", gap: 3 }}>
+              <i className="ti ti-brand-line" style={{ fontSize: 9 }} />業者依頼済
+              <button onClick={() => onUpdateTask(task.id, { vendorRequested: false })} style={styles.tagRemoveBtn} title="タグを削除">
+                <i className="ti ti-x" style={{ fontSize: 8 }} />
+              </button>
             </span>
           )}
         </div>
@@ -322,7 +328,13 @@ export default function DetailPane({ task, project, onMemoChange, onUpdateTask, 
             ) : (
               <button
                 style={styles.slackSendBtn}
-                onClick={() => { setRequestSent(true); onUpdateTask(task.id, { staffRequested: true }); }}
+                onClick={() => {
+                  const ts = new Date().toLocaleString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+                  const note = `[スタッフへ依頼: ${ts}]`;
+                  onMemoChange(task.id, task.memo ? `${task.memo}\n${note}` : note);
+                  onUpdateTask(task.id, { staffRequested: true });
+                  setRequestSent(true);
+                }}
               >
                 <i className="ti ti-brand-slack" style={{ fontSize: 13 }} />
                 Slackに送信する
@@ -357,7 +369,13 @@ export default function DetailPane({ task, project, onMemoChange, onUpdateTask, 
             ) : (
               <button
                 style={styles.lineSendBtn}
-                onClick={() => { setVendorSent(true); onUpdateTask(task.id, { vendorRequested: true }); }}
+                onClick={() => {
+                  const ts = new Date().toLocaleString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+                  const note = `[協力業者へ依頼: ${ts}]`;
+                  onMemoChange(task.id, task.memo ? `${task.memo}\n${note}` : note);
+                  onUpdateTask(task.id, { vendorRequested: true });
+                  setVendorSent(true);
+                }}
               >
                 <i className="ti ti-brand-line" style={{ fontSize: 14 }} />
                 LINEに送信する
@@ -405,6 +423,7 @@ const styles: Record<string, React.CSSProperties> = {
   slackSendBtn: { display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", padding: "8px 12px", border: "none", background: "#4A154B", color: "#fff", cursor: "pointer", fontSize: 12.5, fontWeight: 500, fontFamily: "inherit" },
   sentBadge: { display: "flex", alignItems: "center", justifyContent: "center", gap: 5, padding: "8px 12px", fontSize: 11.5, color: "var(--color-text-tertiary)", background: "var(--color-bg-secondary)" },
   vendorRequestBtn: { background: "#E8F8EC", color: "#1B7F3A", borderColor: "#A8D9B4", marginTop: 2 },
+  tagRemoveBtn: { border: "none", background: "transparent", cursor: "pointer", padding: 0, display: "inline-flex", alignItems: "center", color: "inherit", opacity: 0.6, lineHeight: 1 },
   vendorPanelHeader: { background: "#E8F8EC", color: "#1B7F3A" },
   lineSendBtn: { display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", padding: "8px 12px", border: "none", background: "#06C755", color: "#fff", cursor: "pointer", fontSize: 12.5, fontWeight: 500, fontFamily: "inherit" },
 

@@ -191,13 +191,19 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
             <span style={styles.chip}>{task.due}</span>
             {proj && <span style={{ ...styles.chip, background: domColor.bg, color: domColor.color, border: "none" }}>{proj.name}</span>}
             {task.staffRequested && (
-              <span style={{ ...styles.chip, background: "#F4ECF5", color: "#4A154B", border: "0.5px solid #C9A8CB" }}>
-                <i className="ti ti-brand-slack" style={{ fontSize: 9, marginRight: 2 }} />スタッフ依頼済
+              <span style={{ ...styles.chip, background: "#F4ECF5", color: "#4A154B", border: "0.5px solid #C9A8CB", display: "inline-flex", alignItems: "center", gap: 3 }}>
+                <i className="ti ti-brand-slack" style={{ fontSize: 9 }} />スタッフ依頼済
+                <button onClick={(e) => { e.stopPropagation(); onUpdateTask(task.id, { staffRequested: false }); }} style={styles.tagRemoveBtn} title="タグを削除">
+                  <i className="ti ti-x" style={{ fontSize: 8 }} />
+                </button>
               </span>
             )}
             {task.vendorRequested && (
-              <span style={{ ...styles.chip, background: "#E8F8EC", color: "#1B7F3A", border: "0.5px solid #A8D9B4" }}>
-                <i className="ti ti-brand-line" style={{ fontSize: 9, marginRight: 2 }} />業者依頼済
+              <span style={{ ...styles.chip, background: "#E8F8EC", color: "#1B7F3A", border: "0.5px solid #A8D9B4", display: "inline-flex", alignItems: "center", gap: 3 }}>
+                <i className="ti ti-brand-line" style={{ fontSize: 9 }} />業者依頼済
+                <button onClick={(e) => { e.stopPropagation(); onUpdateTask(task.id, { vendorRequested: false }); }} style={styles.tagRemoveBtn} title="タグを削除">
+                  <i className="ti ti-x" style={{ fontSize: 8 }} />
+                </button>
               </span>
             )}
           </div>
@@ -398,6 +404,7 @@ const styles: Record<string, React.CSSProperties> = {
   rowIconBtn: { width: 22, height: 22, border: "none", borderRadius: 4, background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "var(--color-text-tertiary)", padding: 0 },
   editInput: { width: "100%", padding: "2px 6px", fontSize: 12.5, border: "0.5px solid var(--color-border-mid)", borderRadius: 4, background: "var(--color-bg)", color: "var(--color-text-primary)", outline: "none", fontFamily: "inherit", marginBottom: 2 },
   chip: { fontSize: 10, padding: "1px 6px", borderRadius: 4, border: "0.5px solid var(--color-border)", color: "var(--color-text-secondary)", background: "transparent" },
+  tagRemoveBtn: { border: "none", background: "transparent", cursor: "pointer", padding: 0, display: "inline-flex", alignItems: "center", color: "inherit", opacity: 0.6, lineHeight: 1 },
   sectionLabel: { padding: "6px 12px", fontSize: 10, fontWeight: 500, color: "var(--color-text-tertiary)", letterSpacing: "0.06em", textTransform: "uppercase" as const, background: "var(--color-bg-secondary)", borderBottom: "0.5px solid var(--color-border)" },
   progressBar: { height: 3, background: "var(--color-bg-secondary)", borderRadius: 2, margin: "8px 12px" },
   progressFill: { height: "100%", borderRadius: 2, background: "var(--color-dot-green)", transition: "width 0.3s ease" },
