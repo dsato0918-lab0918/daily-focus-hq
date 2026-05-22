@@ -48,24 +48,30 @@ ${taskSummary || "（タスクなし）"}
     while (historyMsgs.length > 0 && historyMsgs[0].role !== "user") {
       historyMsgs = historyMsgs.slice(1);
     }
+    const lastUserText = messages[messages.length - 1].text;
+
+    // systemInstruction非対応のため、システムプロンプトを最初のメッセージに埋め込む
+    const systemTurn = [
+      { role: "user",  parts: [{ text: `以下の指示に従って動作してください:\n${systemPrompt}` }] },
+      { role: "model", parts: [{ text: "了解しました。指示に従ってアシストします。" }] },
+    ];
+
     const contents = [
+      ...systemTurn,
       ...historyMsgs.map((msg: { role: string; text: string }) => ({
         role: msg.role === "user" ? "user" : "model",
         parts: [{ text: msg.text }],
       })),
-      { role: "user", parts: [{ text: messages[messages.length - 1].text }] },
+      { role: "user", parts: [{ text: lastUserText }] },
     ];
 
-    // SDK を使わず v1 REST API を直接呼び出す
+    // v1 REST API を直接呼び出す
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemPrompt }] },
-          contents,
-        }),
+        body: JSON.stringify({ contents }),
       }
     );
 
