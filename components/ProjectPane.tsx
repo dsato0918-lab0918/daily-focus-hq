@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import type { Domain, DomainKey, Project } from "@/lib/types";
 
 interface Props {
@@ -12,6 +12,8 @@ interface Props {
   onAddProject: (name: string, domain: DomainKey) => void;
   onUpdateProject: (id: string, updates: Partial<Project>) => void;
   onDeleteProject: (id: string) => void;
+  onArchiveProject: (id: string) => void;
+  onRestoreProject: (id: string) => void;
 }
 
 const STATUS_COLORS: Record<Project["status"], string> = {
@@ -21,7 +23,11 @@ const STATUS_COLORS: Record<Project["status"], string> = {
 };
 const STATUS_LABELS: Record<Project["status"], string> = { g: "順調", a: "注意", r: "遅延" };
 
-export default function ProjectPane({ domains, projects, curDomain, curProjId, onSelect, onAddProject, onUpdateProject, onDeleteProject }: Props) {
+export default function ProjectPane({
+  domains, projects, curDomain, curProjId,
+  onSelect, onAddProject, onUpdateProject, onDeleteProject,
+  onArchiveProject, onRestoreProject,
+}: Props) {
   const [adding, setAdding] = useState(false);
   const [addName, setAddName] = useState("");
   const [addDomainId, setAddDomainId] = useState<DomainKey>("");
@@ -29,6 +35,7 @@ export default function ProjectPane({ domains, projects, curDomain, curProjId, o
   const [editValue, setEditValue] = useState("");
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
   const addRef = useRef<HTMLInputElement>(null);
   const editRef = useRef<HTMLInputElement>(null);
 
@@ -36,6 +43,22 @@ export default function ProjectPane({ domains, projects, curDomain, curProjId, o
     if (adding) { setAddDomainId(curDomain !== "all" ? curDomain : (domains[0]?.id ?? "")); addRef.current?.focus(); }
   }, [adding, curDomain, domains]);
   useEffect(() => { if (editingId) editRef.current?.focus(); }, [editingId]);
+
+  // ドメインIDからドメインを引くマップ
+  const domainMap = useMemo(() => new Map(domains.map((d) => [d.id, d])), [domains]);
+
+  // アクティブ / アーカイブ済みを分離
+  const activeProjects   = useMemo(() => projects.filter((p) => !p.archived), [projects]);
+  const archivedProjects = useMemo(() => projects.filter((p) =>  p.archived), [projects]);
+
+  // 表示対象（セクションフィルタ適用）
+  const visibleActive = useMemo(() =>
+    curDomain === "all" ? activeProjects : activeProjects.filter((p) => p.domain === curDomain),
+    [activeProjects, curDomain]);
+
+  const visibleArchived = useMemo(() =>
+    curDomain === "all" ? archivedProjects : archivedProjects.filter((p) => p.domain === curDomain),
+    [archivedProjects, curDomain]);
 
   const startEdit = (p: Project) => { setEditingId(p.id); setEditValue(p.name); };
   const confirmEdit = () => {
@@ -50,10 +73,11 @@ export default function ProjectPane({ domains, projects, curDomain, curProjId, o
     else { setConfirmDeleteId(id); setTimeout(() => setConfirmDeleteId(null), 3000); }
   };
 
+  // アクティブなプロジェクト行
   const renderProject = (proj: Project) => {
-    const isActive = curProjId === proj.id;
-    const isHovered = hoveredId === proj.id;
-    const isEditing = editingId === proj.id;
+    const isActive   = curProjId === proj.id;
+    const isHovered  = hoveredId === proj.id;
+    const isEditing  = editingId === proj.id;
     const isConfirmingDelete = confirmDeleteId === proj.id;
 
     return (
@@ -96,6 +120,9 @@ export default function ProjectPane({ domains, projects, curDomain, curProjId, o
             <button style={s.iconBtn} onClick={() => startEdit(proj)} title="名称を編集">
               <i className="ti ti-pencil" />
             </button>
+            <button style={s.iconBtn} onClick={() => onArchiveProject(proj.id)} title="アーカイブ">
+              <i className="ti ti-archive" />
+            </button>
             <button style={{ ...s.iconBtn, color: isConfirmingDelete ? "#E24B4A" : undefined }}
               onClick={() => handleDelete(proj.id)} title={isConfirmingDelete ? "もう一度クリックで削除" : "削除"}>
               <i className={isConfirmingDelete ? "ti ti-alert-triangle" : "ti ti-trash"} />
@@ -106,18 +133,56 @@ export default function ProjectPane({ domains, projects, curDomain, curProjId, o
     );
   };
 
+  // アーカイブ済みプロジェクト行
+  const renderArchivedProject = (proj: Project) => {
+    const domain = domainMap.get(proj.domain);
+    const isConfirmingDelete = confirmDeleteId === proj.id;
+
+    return (
+      <div
+        key={proj.id}
+        style={{ ...s.row, opacity: 0.72, cursor: "default" }}
+        onMouseEnter={() => setHoveredId(proj.id)}
+        onMouseLeave={() => setHoveredId(null)}
+      >
+        {/* ドメインタグ */}
+        {domain && (
+          <span style={{ ...s.domainTag, background: domain.bgColor, color: domain.textColor }}>
+            {domain.label}
+          </span>
+        )}
+
+        <span style={{ fontSize: 12.5, flex: 1, color: "var(--color-text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {proj.name}
+        </span>
+
+        <div style={s.actions} onClick={(e) => e.stopPropagation()}>
+          <button style={{ ...s.iconBtn, color: "var(--color-info-text)" }} onClick={() => onRestoreProject(proj.id)} title="アクティブに戻す">
+            <i className="ti ti-restore" />
+          </button>
+          <button style={{ ...s.iconBtn, color: isConfirmingDelete ? "#E24B4A" : undefined }}
+            onClick={() => handleDelete(proj.id)} title={isConfirmingDelete ? "もう一度クリックで削除" : "削除"}>
+            <i className={isConfirmingDelete ? "ti ti-alert-triangle" : "ti ti-trash"} />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div style={s.pane}>
       <div style={s.header}>プロジェクト</div>
 
+      {/* ── アクティブなプロジェクト ── */}
       {curDomain === "all"
         ? domains.map((d) => {
-            const filtered = projects.filter((p) => p.domain === d.id);
+            const filtered = visibleActive.filter((p) => p.domain === d.id);
             if (!filtered.length) return null;
             return <div key={d.id}><div style={s.sectionLabel}>{d.label}</div>{filtered.map(renderProject)}</div>;
           })
-        : projects.filter((p) => p.domain === curDomain).map(renderProject)}
+        : visibleActive.map(renderProject)}
 
+      {/* ── 追加フォーム / ボタン ── */}
       {adding ? (
         <div style={s.addForm}>
           <input ref={addRef} style={s.input} placeholder="プロジェクト名..." value={addName}
@@ -138,12 +203,30 @@ export default function ProjectPane({ domains, projects, curDomain, curProjId, o
           <i className="ti ti-plus" aria-hidden="true" /> プロジェクトを追加
         </button>
       )}
+
+      {/* ── アーカイブ済みセクション ── */}
+      {visibleArchived.length > 0 && (
+        <div style={{ marginTop: "auto" }}>
+          <button
+            style={s.archiveToggle}
+            onClick={() => setShowArchived((v) => !v)}
+          >
+            <i className={`ti ${showArchived ? "ti-chevron-down" : "ti-chevron-right"}`} style={{ fontSize: 11 }} />
+            アーカイブ済み（{visibleArchived.length}件）
+          </button>
+          {showArchived && (
+            <div style={{ borderTop: "0.5px solid var(--color-border)" }}>
+              {visibleArchived.map(renderArchivedProject)}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
 const s: Record<string, React.CSSProperties> = {
-  pane: { display: "flex", flexDirection: "column", borderRight: "0.5px solid var(--color-border)", background: "var(--color-bg)", overflowY: "auto" },
+  pane: { display: "flex", flexDirection: "column", borderRight: "0.5px solid var(--color-border)", background: "var(--color-bg)", overflowY: "auto", height: "100%" },
   header: { padding: "10px 12px", fontSize: 11, fontWeight: 500, color: "var(--color-text-secondary)", background: "var(--color-bg-secondary)", borderBottom: "0.5px solid var(--color-border)", letterSpacing: "0.04em", textTransform: "uppercase", flexShrink: 0 },
   sectionLabel: { padding: "6px 12px", fontSize: 10, fontWeight: 500, color: "var(--color-text-tertiary)", letterSpacing: "0.06em", textTransform: "uppercase" as const, background: "var(--color-bg-secondary)", borderBottom: "0.5px solid var(--color-border)" },
   row: { display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", borderBottom: "0.5px solid var(--color-border)", cursor: "pointer", minHeight: 36 },
@@ -159,4 +242,6 @@ const s: Record<string, React.CSSProperties> = {
   formActions: { display: "flex", gap: 4 },
   confirmBtn: { flex: 1, padding: "4px 8px", fontSize: 11, fontWeight: 500, border: "0.5px solid var(--color-border-mid)", borderRadius: 5, background: "var(--color-info-bg)", color: "var(--color-info-text)", cursor: "pointer" },
   cancelBtn: { flex: 1, padding: "4px 8px", fontSize: 11, border: "0.5px solid var(--color-border)", borderRadius: 5, background: "transparent", color: "var(--color-text-secondary)", cursor: "pointer" },
+  archiveToggle: { display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", border: "none", borderBottom: "0.5px solid var(--color-border)", borderTop: "0.5px solid var(--color-border)", width: "100%", textAlign: "left", fontSize: 11, cursor: "pointer", color: "var(--color-text-tertiary)", background: "var(--color-bg-secondary)" },
+  domainTag: { fontSize: 10, padding: "1px 6px", borderRadius: 4, fontWeight: 500, flexShrink: 0, whiteSpace: "nowrap" as const },
 };

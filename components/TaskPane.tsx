@@ -127,10 +127,10 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
   };
 
   const visibleTasks = useMemo(() => {
-    let filtered: Task[];
-    if (curProjId) filtered = tasks.filter((t) => t.projId === curProjId);
-    else if (curDomain !== "all") filtered = tasks.filter((t) => projMap.get(t.projId)?.domain === curDomain);
-    else filtered = tasks;
+    // アーカイブ済みプロジェクトのタスクは常に除外
+    let filtered = tasks.filter((t) => !projMap.get(t.projId)?.archived);
+    if (curProjId) filtered = filtered.filter((t) => t.projId === curProjId);
+    else if (curDomain !== "all") filtered = filtered.filter((t) => projMap.get(t.projId)?.domain === curDomain);
     if (!showDone) filtered = filtered.filter((t) => !t.done);
     return sortTasks(filtered, sortBy);
   }, [tasks, curProjId, curDomain, projMap, sortBy, showDone]);

@@ -15,6 +15,7 @@ export interface Project {
   domain: DomainKey;
   name: string;
   status: ProjectStatus;
+  archived?: boolean;
 }
 
 export interface Task {

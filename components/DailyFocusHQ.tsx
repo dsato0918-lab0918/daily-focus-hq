@@ -111,6 +111,14 @@ export default function DailyFocusHQ() {
     setCurProjId((cur) => (cur === id ? null : cur));
     setSelTaskId(null);
   }, []);
+  const handleArchiveProject = useCallback((id: string) => {
+    setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, archived: true } : p)));
+    setCurProjId((cur) => (cur === id ? null : cur));
+    setSelTaskId(null);
+  }, []);
+  const handleRestoreProject = useCallback((id: string) => {
+    setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, archived: false } : p)));
+  }, []);
 
   // ── セクション操作 ────────────────────────────────────────────
   const handleAddDomain = useCallback((name: string) => {
@@ -147,6 +155,8 @@ export default function DailyFocusHQ() {
     onAddProject: handleAddProject,
     onUpdateProject: handleUpdateProject,
     onDeleteProject: handleDeleteProject,
+    onArchiveProject: handleArchiveProject,
+    onRestoreProject: handleRestoreProject,
   };
   const taskProps = {
     tasks, projects, domains, curDomain, curProjId, selTaskId,
