@@ -1,0 +1,162 @@
+"use client";
+
+import { useState, useRef, useEffect } from "react";
+import type { Domain, DomainKey, Project } from "@/lib/types";
+
+interface Props {
+  domains: Domain[];
+  projects: Project[];
+  curDomain: DomainKey;
+  curProjId: string | null;
+  onSelect: (projId: string | null) => void;
+  onAddProject: (name: string, domain: DomainKey) => void;
+  onUpdateProject: (id: string, updates: Partial<Project>) => void;
+  onDeleteProject: (id: string) => void;
+}
+
+const STATUS_COLORS: Record<Project["status"], string> = {
+  g: "var(--color-dot-green)",
+  a: "var(--color-dot-amber)",
+  r: "var(--color-dot-red)",
+};
+const STATUS_LABELS: Record<Project["status"], string> = { g: "順調", a: "注意", r: "遅延" };
+
+export default function ProjectPane({ domains, projects, curDomain, curProjId, onSelect, onAddProject, onUpdateProject, onDeleteProject }: Props) {
+  const [adding, setAdding] = useState(false);
+  const [addName, setAddName] = useState("");
+  const [addDomainId, setAddDomainId] = useState<DomainKey>("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const addRef = useRef<HTMLInputElement>(null);
+  const editRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (adding) { setAddDomainId(curDomain !== "all" ? curDomain : (domains[0]?.id ?? "")); addRef.current?.focus(); }
+  }, [adding, curDomain, domains]);
+  useEffect(() => { if (editingId) editRef.current?.focus(); }, [editingId]);
+
+  const startEdit = (p: Project) => { setEditingId(p.id); setEditValue(p.name); };
+  const confirmEdit = () => {
+    if (editingId && editValue.trim()) onUpdateProject(editingId, { name: editValue.trim() });
+    setEditingId(null);
+  };
+  const confirmAdd = () => {
+    if (addName.trim() && addDomainId) { onAddProject(addName.trim(), addDomainId); setAddName(""); setAdding(false); }
+  };
+  const handleDelete = (id: string) => {
+    if (confirmDeleteId === id) { onDeleteProject(id); setConfirmDeleteId(null); }
+    else { setConfirmDeleteId(id); setTimeout(() => setConfirmDeleteId(null), 3000); }
+  };
+
+  const renderProject = (proj: Project) => {
+    const isActive = curProjId === proj.id;
+    const isHovered = hoveredId === proj.id;
+    const isEditing = editingId === proj.id;
+    const isConfirmingDelete = confirmDeleteId === proj.id;
+
+    return (
+      <div
+        key={proj.id}
+        style={{ ...s.row, background: isActive ? "var(--color-info-bg)" : isHovered ? "var(--color-bg-secondary)" : "transparent" }}
+        onClick={() => !isEditing && onSelect(isActive ? null : proj.id)}
+        onMouseEnter={() => setHoveredId(proj.id)}
+        onMouseLeave={() => setHoveredId(null)}
+      >
+        {/* ステータスドット（ホバー時はステータス変更ボタンに） */}
+        {isHovered && !isEditing ? (
+          <div style={s.statusBtns} onClick={(e) => e.stopPropagation()}>
+            {(["g", "a", "r"] as Project["status"][]).map((st) => (
+              <button key={st} title={STATUS_LABELS[st]}
+                style={{ ...s.statusDot, background: STATUS_COLORS[st], opacity: proj.status === st ? 1 : 0.3 }}
+                onClick={() => onUpdateProject(proj.id, { status: st })}
+              />
+            ))}
+          </div>
+        ) : (
+          <span style={{ ...s.dot, background: STATUS_COLORS[proj.status] }} />
+        )}
+
+        {isEditing ? (
+          <input ref={editRef} style={s.inlineInput} value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => { if (e.key === "Enter") confirmEdit(); if (e.key === "Escape") setEditingId(null); }}
+            onBlur={confirmEdit}
+          />
+        ) : (
+          <span style={{ fontSize: 12.5, flex: 1, color: isActive ? "var(--color-info-text)" : "var(--color-text-primary)", fontWeight: isActive ? 500 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {proj.name}
+          </span>
+        )}
+
+        {!isEditing && isHovered && (
+          <div style={s.actions} onClick={(e) => e.stopPropagation()}>
+            <button style={s.iconBtn} onClick={() => startEdit(proj)} title="名称を編集">
+              <i className="ti ti-pencil" />
+            </button>
+            <button style={{ ...s.iconBtn, color: isConfirmingDelete ? "#E24B4A" : undefined }}
+              onClick={() => handleDelete(proj.id)} title={isConfirmingDelete ? "もう一度クリックで削除" : "削除"}>
+              <i className={isConfirmingDelete ? "ti ti-alert-triangle" : "ti ti-trash"} />
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div style={s.pane}>
+      <div style={s.header}>プロジェクト</div>
+
+      {curDomain === "all"
+        ? domains.map((d) => {
+            const filtered = projects.filter((p) => p.domain === d.id);
+            if (!filtered.length) return null;
+            return <div key={d.id}><div style={s.sectionLabel}>{d.label}</div>{filtered.map(renderProject)}</div>;
+          })
+        : projects.filter((p) => p.domain === curDomain).map(renderProject)}
+
+      {adding ? (
+        <div style={s.addForm}>
+          <input ref={addRef} style={s.input} placeholder="プロジェクト名..." value={addName}
+            onChange={(e) => setAddName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") confirmAdd(); if (e.key === "Escape") { setAdding(false); setAddName(""); } }} />
+          {curDomain === "all" && (
+            <select style={{ ...s.input, marginBottom: 6 }} value={addDomainId} onChange={(e) => setAddDomainId(e.target.value)}>
+              {domains.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
+            </select>
+          )}
+          <div style={s.formActions}>
+            <button style={s.confirmBtn} onClick={confirmAdd}>追加</button>
+            <button style={s.cancelBtn} onClick={() => { setAdding(false); setAddName(""); }}>キャンセル</button>
+          </div>
+        </div>
+      ) : (
+        <button style={s.addBtn} onClick={() => setAdding(true)}>
+          <i className="ti ti-plus" aria-hidden="true" /> プロジェクトを追加
+        </button>
+      )}
+    </div>
+  );
+}
+
+const s: Record<string, React.CSSProperties> = {
+  pane: { display: "flex", flexDirection: "column", borderRight: "0.5px solid var(--color-border)", background: "var(--color-bg)", overflowY: "auto" },
+  header: { padding: "10px 12px", fontSize: 11, fontWeight: 500, color: "var(--color-text-secondary)", background: "var(--color-bg-secondary)", borderBottom: "0.5px solid var(--color-border)", letterSpacing: "0.04em", textTransform: "uppercase", flexShrink: 0 },
+  sectionLabel: { padding: "6px 12px", fontSize: 10, fontWeight: 500, color: "var(--color-text-tertiary)", letterSpacing: "0.06em", textTransform: "uppercase" as const, background: "var(--color-bg-secondary)", borderBottom: "0.5px solid var(--color-border)" },
+  row: { display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", borderBottom: "0.5px solid var(--color-border)", cursor: "pointer", minHeight: 36 },
+  dot: { width: 8, height: 8, borderRadius: "50%", flexShrink: 0 },
+  statusBtns: { display: "flex", gap: 3, flexShrink: 0 },
+  statusDot: { width: 8, height: 8, borderRadius: "50%", border: "none", cursor: "pointer", padding: 0, transition: "opacity 0.15s" },
+  actions: { display: "flex", gap: 2, flexShrink: 0 },
+  iconBtn: { width: 22, height: 22, border: "none", borderRadius: 4, background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "var(--color-text-tertiary)", padding: 0 },
+  inlineInput: { flex: 1, padding: "2px 6px", fontSize: 12.5, border: "0.5px solid var(--color-border-mid)", borderRadius: 4, background: "var(--color-bg)", color: "var(--color-text-primary)", outline: "none", fontFamily: "inherit" },
+  addBtn: { display: "flex", alignItems: "center", gap: 6, padding: "9px 12px", border: "none", borderBottom: "0.5px solid var(--color-border)", width: "100%", textAlign: "left", fontSize: 12, cursor: "pointer", color: "var(--color-text-tertiary)", background: "transparent" },
+  addForm: { padding: "8px 10px", borderBottom: "0.5px solid var(--color-border)", background: "var(--color-bg-secondary)" },
+  input: { width: "100%", padding: "5px 8px", fontSize: 12, border: "0.5px solid var(--color-border-mid)", borderRadius: 6, background: "var(--color-bg)", color: "var(--color-text-primary)", outline: "none", marginBottom: 6, fontFamily: "inherit" },
+  formActions: { display: "flex", gap: 4 },
+  confirmBtn: { flex: 1, padding: "4px 8px", fontSize: 11, fontWeight: 500, border: "0.5px solid var(--color-border-mid)", borderRadius: 5, background: "var(--color-info-bg)", color: "var(--color-info-text)", cursor: "pointer" },
+  cancelBtn: { flex: 1, padding: "4px 8px", fontSize: 11, border: "0.5px solid var(--color-border)", borderRadius: 5, background: "transparent", color: "var(--color-text-secondary)", cursor: "pointer" },
+};
