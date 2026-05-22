@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import type { Domain, DomainKey, Project } from "@/lib/types";
+import type { Domain, DomainKey, Project, Task } from "@/lib/types";
 
 interface Props {
   domains: Domain[];
   projects: Project[];
+  tasks: Task[];
   curDomain: DomainKey;
   curProjId: string | null;
   onSelect: (projId: string | null) => void;
@@ -24,7 +25,7 @@ const STATUS_COLORS: Record<Project["status"], string> = {
 const STATUS_LABELS: Record<Project["status"], string> = { g: "順調", a: "注意", r: "遅延" };
 
 export default function ProjectPane({
-  domains, projects, curDomain, curProjId,
+  domains, projects, tasks, curDomain, curProjId,
   onSelect, onAddProject, onUpdateProject, onDeleteProject,
   onArchiveProject, onRestoreProject,
 }: Props) {
@@ -46,6 +47,15 @@ export default function ProjectPane({
 
   // ドメインIDからドメインを引くマップ
   const domainMap = useMemo(() => new Map(domains.map((d) => [d.id, d])), [domains]);
+
+  // プロジェクトIDごとの未完了タスク数
+  const taskCountMap = useMemo(() => {
+    const map = new Map<string, number>();
+    tasks.forEach((t) => {
+      if (!t.done) map.set(t.projId, (map.get(t.projId) ?? 0) + 1);
+    });
+    return map;
+  }, [tasks]);
 
   // アクティブ / アーカイブ済みを分離
   const activeProjects   = useMemo(() => projects.filter((p) => !p.archived), [projects]);
@@ -79,6 +89,7 @@ export default function ProjectPane({
     const isHovered  = hoveredId === proj.id;
     const isEditing  = editingId === proj.id;
     const isConfirmingDelete = confirmDeleteId === proj.id;
+    const taskCount  = taskCountMap.get(proj.id) ?? 0;
 
     return (
       <div
@@ -115,7 +126,7 @@ export default function ProjectPane({
           </span>
         )}
 
-        {!isEditing && isHovered && (
+        {!isEditing && isHovered ? (
           <div style={s.actions} onClick={(e) => e.stopPropagation()}>
             <button style={s.iconBtn} onClick={() => startEdit(proj)} title="名称を編集">
               <i className="ti ti-pencil" />
@@ -128,7 +139,11 @@ export default function ProjectPane({
               <i className={isConfirmingDelete ? "ti ti-alert-triangle" : "ti ti-trash"} />
             </button>
           </div>
-        )}
+        ) : !isEditing ? (
+          <span style={{ ...s.badge, background: isActive ? "rgba(0,0,0,0.08)" : "var(--color-bg-secondary)", color: isActive ? "var(--color-info-text)" : "var(--color-text-tertiary)" }}>
+            {taskCount}
+          </span>
+        ) : null}
       </div>
     );
   };
@@ -244,4 +259,5 @@ const s: Record<string, React.CSSProperties> = {
   cancelBtn: { flex: 1, padding: "4px 8px", fontSize: 11, border: "0.5px solid var(--color-border)", borderRadius: 5, background: "transparent", color: "var(--color-text-secondary)", cursor: "pointer" },
   archiveToggle: { display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", border: "none", borderBottom: "0.5px solid var(--color-border)", borderTop: "0.5px solid var(--color-border)", width: "100%", textAlign: "left", fontSize: 11, cursor: "pointer", color: "var(--color-text-tertiary)", background: "var(--color-bg-secondary)" },
   domainTag: { fontSize: 10, padding: "1px 6px", borderRadius: 4, fontWeight: 500, flexShrink: 0, whiteSpace: "nowrap" as const },
+  badge: { fontSize: 10, borderRadius: 10, padding: "1px 6px", minWidth: 18, textAlign: "center" as const, flexShrink: 0 },
 };

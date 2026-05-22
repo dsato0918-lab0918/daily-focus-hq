@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import type { Domain, DomainKey, Project, Task } from "@/lib/types";
+import type { Domain, DomainKey, Project } from "@/lib/types";
 
 interface Props {
   domains: Domain[];
-  tasks: Task[];
   projects: Project[];
   curDomain: DomainKey;
   onSelect: (domain: DomainKey) => void;
@@ -14,7 +13,7 @@ interface Props {
   onDeleteDomain: (id: string) => void;
 }
 
-export default function DomainPane({ domains, tasks, projects, curDomain, onSelect, onAddDomain, onUpdateDomain, onDeleteDomain }: Props) {
+export default function DomainPane({ domains, projects, curDomain, onSelect, onAddDomain, onUpdateDomain, onDeleteDomain }: Props) {
   const [adding, setAdding] = useState(false);
   const [addName, setAddName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -27,9 +26,9 @@ export default function DomainPane({ domains, tasks, projects, curDomain, onSele
   useEffect(() => { if (adding) addRef.current?.focus(); }, [adding]);
   useEffect(() => { if (editingId) editRef.current?.focus(); }, [editingId]);
 
-  const projDomainMap = new Map(projects.map((p) => [p.id, p.domain]));
-  const countPending = (id: DomainKey | "all") =>
-    tasks.filter((t) => !t.done && (id === "all" || projDomainMap.get(t.projId) === id)).length;
+  // セクションにはアクティブ（非アーカイブ）なプロジェクト数を表示
+  const countProjects = (id: DomainKey | "all") =>
+    projects.filter((p) => !p.archived && (id === "all" || p.domain === id)).length;
 
   const startEdit = (d: Domain) => { setEditingId(d.id); setEditValue(d.label); };
   const confirmEdit = () => {
@@ -60,7 +59,7 @@ export default function DomainPane({ domains, tasks, projects, curDomain, onSele
           <i className="ti ti-layout-grid" aria-hidden="true" />
         </span>
         <span style={{ ...s.label, color: curDomain === "all" ? "var(--color-info-text)" : "var(--color-text-primary)", fontWeight: curDomain === "all" ? 500 : 400 }}>全体俯瞰</span>
-        <span style={{ ...s.badge, background: curDomain === "all" ? "rgba(0,0,0,0.08)" : "var(--color-bg-secondary)", color: curDomain === "all" ? "var(--color-info-text)" : "var(--color-text-tertiary)" }}>{countPending("all")}</span>
+        <span style={{ ...s.badge, background: curDomain === "all" ? "rgba(0,0,0,0.08)" : "var(--color-bg-secondary)", color: curDomain === "all" ? "var(--color-info-text)" : "var(--color-text-tertiary)" }}>{countProjects("all")}</span>
       </div>
 
       {/* ユーザー定義の大分野 */}
@@ -113,7 +112,7 @@ export default function DomainPane({ domains, tasks, projects, curDomain, onSele
                 </button>
               </div>
             ) : !isEditing ? (
-              <span style={{ ...s.badge, background: isActive ? "rgba(0,0,0,0.08)" : "var(--color-bg-secondary)", color: isActive ? "var(--color-info-text)" : "var(--color-text-tertiary)" }}>{countPending(d.id)}</span>
+              <span style={{ ...s.badge, background: isActive ? "rgba(0,0,0,0.08)" : "var(--color-bg-secondary)", color: isActive ? "var(--color-info-text)" : "var(--color-text-tertiary)" }}>{countProjects(d.id)}</span>
             ) : null}
           </div>
         );

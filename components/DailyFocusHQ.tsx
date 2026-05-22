@@ -143,14 +143,14 @@ export default function DailyFocusHQ() {
 
   // ── 共通 props ───────────────────────────────────────────────
   const domainProps = {
-    domains, tasks, projects, curDomain,
+    domains, projects, curDomain,
     onSelect: handleSelectDomain,
     onAddDomain: handleAddDomain,
     onUpdateDomain: handleUpdateDomain,
     onDeleteDomain: handleDeleteDomain,
   };
   const projectProps = {
-    domains, projects, curDomain, curProjId,
+    domains, projects, tasks, curDomain, curProjId,
     onSelect: handleSelectProj,
     onAddProject: handleAddProject,
     onUpdateProject: handleUpdateProject,
