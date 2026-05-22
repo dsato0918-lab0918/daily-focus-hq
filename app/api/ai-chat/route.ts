@@ -65,6 +65,12 @@ ${taskSummary || "（タスクなし）"}
       { role: "user", parts: [{ text: lastUserText }] },
     ];
 
+    // [DEBUG] 利用可能なモデル一覧を返す
+    const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}&pageSize=50`);
+    const listData = await listRes.json();
+    const modelNames = (listData.models || []).map((m: {name: string}) => m.name).join(", ");
+    return NextResponse.json({ text: `利用可能モデル: ${modelNames}` });
+
     // v1 REST API を直接呼び出す
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
