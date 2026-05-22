@@ -190,6 +190,16 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
             {task.urgent && !task.done && <span style={{ ...styles.chip, background: "#FCEBEB", color: "#A32D2D", border: "none" }}>急ぎ</span>}
             <span style={styles.chip}>{task.due}</span>
             {proj && <span style={{ ...styles.chip, background: domColor.bg, color: domColor.color, border: "none" }}>{proj.name}</span>}
+            {task.staffRequested && (
+              <span style={{ ...styles.chip, background: "#F4ECF5", color: "#4A154B", border: "0.5px solid #C9A8CB" }}>
+                <i className="ti ti-brand-slack" style={{ fontSize: 9, marginRight: 2 }} />スタッフ依頼済
+              </span>
+            )}
+            {task.vendorRequested && (
+              <span style={{ ...styles.chip, background: "#E8F8EC", color: "#1B7F3A", border: "0.5px solid #A8D9B4" }}>
+                <i className="ti ti-brand-line" style={{ fontSize: 9, marginRight: 2 }} />業者依頼済
+              </span>
+            )}
           </div>
         </div>
 

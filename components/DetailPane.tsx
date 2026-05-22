@@ -264,6 +264,16 @@ export default function DetailPane({ task, project, onMemoChange, onUpdateTask, 
           >
             {task.urgent ? "急ぎ ✕" : "+ 急ぎ"}
           </button>
+          {task.staffRequested && (
+            <span style={{ ...styles.chip, background: "#F4ECF5", color: "#4A154B", border: "0.5px solid #C9A8CB" }}>
+              <i className="ti ti-brand-slack" style={{ fontSize: 9, marginRight: 2 }} />スタッフ依頼済
+            </span>
+          )}
+          {task.vendorRequested && (
+            <span style={{ ...styles.chip, background: "#E8F8EC", color: "#1B7F3A", border: "0.5px solid #A8D9B4" }}>
+              <i className="ti ti-brand-line" style={{ fontSize: 9, marginRight: 2 }} />業者依頼済
+            </span>
+          )}
         </div>
 
         {/* 期限（クリックで編集） */}
@@ -312,7 +322,7 @@ export default function DetailPane({ task, project, onMemoChange, onUpdateTask, 
             ) : (
               <button
                 style={styles.slackSendBtn}
-                onClick={() => setRequestSent(true)}
+                onClick={() => { setRequestSent(true); onUpdateTask(task.id, { staffRequested: true }); }}
               >
                 <i className="ti ti-brand-slack" style={{ fontSize: 13 }} />
                 Slackに送信する
@@ -347,7 +357,7 @@ export default function DetailPane({ task, project, onMemoChange, onUpdateTask, 
             ) : (
               <button
                 style={styles.lineSendBtn}
-                onClick={() => setVendorSent(true)}
+                onClick={() => { setVendorSent(true); onUpdateTask(task.id, { vendorRequested: true }); }}
               >
                 <i className="ti ti-brand-line" style={{ fontSize: 14 }} />
                 LINEに送信する

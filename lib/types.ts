@@ -26,6 +26,8 @@ export interface Task {
   urgent: boolean;
   done: boolean;
   memo: string;
+  staffRequested?: boolean;
+  vendorRequested?: boolean;
 }
 
 export type View = "list" | "focus";
