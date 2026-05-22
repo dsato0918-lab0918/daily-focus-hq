@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Daily Focus HQ",
+  title: "SUGAR Task",
   description: "設計・施工・経営のタスク管理ワークスペース",
 };
 
