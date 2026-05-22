@@ -145,12 +145,12 @@ export default function FloatingAIChat({ tasks, projects, domains }: Props) {
               style={s.chatInput}
               placeholder="何でも聞いてください... (Enter で送信 / Shift+Enter で改行)"
               value={input}
-              rows={1}
+              rows={3}
               onChange={(e) => {
                 setInput(e.target.value);
                 // 高さを内容に合わせて自動調整
                 e.target.style.height = "auto";
-                e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
+                e.target.style.height = Math.min(e.target.scrollHeight, 150) + "px";
               }}
               onKeyDown={(e) => {
                 // IME変換中（日本語入力の変換確定）は送信しない
@@ -310,6 +310,7 @@ const s: Record<string, React.CSSProperties> = {
     borderTop: "0.5px solid var(--color-border)",
     flexShrink: 0,
     background: "var(--color-bg-secondary)",
+    alignItems: "flex-end",
   },
   chatInput: {
     flex: 1,
@@ -323,8 +324,8 @@ const s: Record<string, React.CSSProperties> = {
     fontFamily: "inherit",
     resize: "none" as const,
     lineHeight: 1.5,
-    minHeight: 34,
-    maxHeight: 120,
+    minHeight: 62,
+    maxHeight: 150,
     overflowY: "auto" as const,
   },
   sendBtn: {
