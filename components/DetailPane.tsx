@@ -132,7 +132,7 @@ export default function DetailPane({ task, project, onMemoChange, onUpdateTask, 
             <i className="ti ti-arrow-left" aria-hidden="true" />
           </button>
           <span style={{ fontSize: 12, fontWeight: 500 }}>AI相談</span>
-          <span style={styles.poweredBy}>Powered by Gemini</span>
+          <span style={styles.poweredBy}>Powered by Groq</span>
         </div>
 
         <div style={styles.chatContext}>

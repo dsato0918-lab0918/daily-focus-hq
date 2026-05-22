@@ -1,23 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-async function callGemini(url: string, body: string): Promise<Response> {
-  // 429 が返ってきたら最大2回リトライ（2秒 → 4秒待機）
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body,
-    });
-    if (res.status !== 429 || attempt === 2) return res;
-    await sleep(2000 * (attempt + 1));
-  }
-  throw new Error("unreachable");
-}
-
 export async function POST(req: NextRequest) {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
       { error: "サーバー設定エラー: APIキーが設定されていません。" },
@@ -44,7 +28,7 @@ export async function POST(req: NextRequest) {
       })
       .join("\n");
 
-    const systemPrompt = `あなたは建設・設計会社向けのタスク管理ツール「Daily Focus HQ」のAIアシスタントです。
+    const systemPrompt = `あなたは建設・設計会社向けのタスク管理ツール「SUGAR Task」のAIアシスタントです。
 ユーザーの現在のタスクとプロジェクトの状況を把握した上で、業務の優先順位付けや進め方についてアドバイスをしてください。
 
 ## 現在のプロジェクト一覧
@@ -59,42 +43,31 @@ ${taskSummary || "（タスクなし）"}
 - 優先度・緊急度・進捗に基づいた実践的なアドバイスをしてください
 - 操作方法の質問にも答えてください`;
 
-    // 会話履歴を構築（先頭のAIメッセージを除去）
-    let historyMsgs = messages.slice(0, -1);
-    while (historyMsgs.length > 0 && historyMsgs[0].role !== "user") {
-      historyMsgs = historyMsgs.slice(1);
-    }
-    const lastUserText = messages[messages.length - 1].text;
-
-    // systemInstruction非対応のため、システムプロンプトを最初のメッセージに埋め込む
-    const systemTurn = [
-      { role: "user",  parts: [{ text: `以下の指示に従って動作してください:\n${systemPrompt}` }] },
-      { role: "model", parts: [{ text: "了解しました。指示に従ってアシストします。" }] },
-    ];
-
-    const contents = [
-      ...systemTurn,
-      ...historyMsgs.map((msg: { role: string; text: string }) => ({
-        role: msg.role === "user" ? "user" : "model",
-        parts: [{ text: msg.text }],
+    // OpenAI互換フォーマットに変換（systemメッセージをネイティブサポート）
+    const chatMessages = [
+      { role: "system", content: systemPrompt },
+      ...messages.map((msg: { role: string; text: string }) => ({
+        role: msg.role === "user" ? "user" : "assistant",
+        content: msg.text,
       })),
-      { role: "user", parts: [{ text: lastUserText }] },
     ];
 
-    const res = await callGemini(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
-      JSON.stringify({ contents })
-    );
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        messages: chatMessages,
+        max_tokens: 500,
+      }),
+    });
 
     if (!res.ok) {
       const errBody = await res.text();
-      console.error("Gemini API error:", errBody);
-      if (res.status === 429) {
-        return NextResponse.json(
-          { error: "AIが混み合っています（429）。少し待ってから再度お試しください。" },
-          { status: 500 }
-        );
-      }
+      console.error("Groq API error:", errBody);
       return NextResponse.json(
         { error: `AI接続エラーが発生しました（${res.status}）。` },
         { status: 500 }
@@ -102,7 +75,7 @@ ${taskSummary || "（タスクなし）"}
     }
 
     const data = await res.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "応答を取得できませんでした。";
+    const text = data.choices?.[0]?.message?.content ?? "応答を取得できませんでした。";
     return NextResponse.json({ text });
 
   } catch (error) {

@@ -88,7 +88,7 @@ export default function FloatingAIChat({ tasks, projects, domains }: Props) {
               </span>
               <div>
                 <div style={s.panelTitle}>AI アシスタント</div>
-                <div style={s.poweredBy}>Powered by Gemini</div>
+                <div style={s.poweredBy}>Powered by Groq</div>
               </div>
             </div>
             <button style={s.closeBtn} onClick={() => setOpen(false)} title="閉じる">
