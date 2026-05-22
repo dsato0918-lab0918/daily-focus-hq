@@ -64,7 +64,6 @@ function sortTasks(tasks: Task[], key: SortKey): Task[] {
     if (a.urgent !== b.urgent) return a.urgent ? -1 : 1;
     return parseDue(a.due) - parseDue(b.due);
   });
-  if (key === "done")   return arr.sort((a, b) => Number(a.done) - Number(b.done));
   return arr;
 }
 
