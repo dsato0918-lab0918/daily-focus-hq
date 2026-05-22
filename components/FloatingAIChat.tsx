@@ -343,8 +343,8 @@ const s: Record<string, React.CSSProperties> = {
     flexShrink: 0,
   },
   fab: {
-    width: 52,
-    height: 52,
+    width: 48,
+    height: 48,
     borderRadius: "50%",
     border: "none",
     background: "var(--color-text-primary)",

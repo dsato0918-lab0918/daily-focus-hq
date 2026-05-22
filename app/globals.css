@@ -194,14 +194,15 @@ textarea {
   }
 
   /* ── クイック追加FAB (AIの上) ── */
+  /* 位置計算: ボトムナビ56px + AIラッパー bottom:72px + FABサイズ48px + gap12px = 132px */
   .mobile-fab-quickadd {
     display: flex;
     position: fixed;
-    bottom: 136px; /* AIのFABより上 */
+    bottom: 132px;
     right: 24px;
     z-index: 999;
-    width: 46px;
-    height: 46px;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
     border: none;
     background: var(--color-success-bg);
