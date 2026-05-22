@@ -91,7 +91,7 @@ ${taskSummary || "（タスクなし）"}
       console.error("Gemini API error:", errBody);
       if (res.status === 429) {
         return NextResponse.json(
-          { error: "AIが混み合っています。少し待ってから再度お試しください。" },
+          { error: "AIが混み合っています（429）。少し待ってから再度お試しください。" },
           { status: 500 }
         );
       }
