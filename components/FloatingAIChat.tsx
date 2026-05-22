@@ -1,31 +1,20 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import type { Task, Project, Domain } from "@/lib/types";
 
 interface Message {
   role: "user" | "ai";
   text: string;
 }
 
-const MOCK_REPLIES = [
-  "タスクの優先度を整理するには、まず期限が近いものと「急ぎ」フラグのついたものを確認しましょう。今日のフォーカスセクションでAIが自動的にトップ3を提案しています。",
-  "プロジェクトの進捗管理には、各プロジェクトのステータスドット（緑・黄・赤）を活用できます。プロジェクト名にホバーするとクリックでステータスを変更できます。",
-  "新しいタスクを追加するには、タスク一覧の下にある「＋タスクを追加」ボタンをクリックしてください。プロジェクト・期限・急ぎフラグも一緒に設定できます。",
-  "大分野を横断してタスクを確認したい場合は、左側の「全体俯瞰」を選択すると、すべての大分野のタスクをまとめて見ることができます。",
-  "タスクの詳細を編集するには、タスクをクリックして右側の詳細ペインを開いてください。タイトル・メモ・期限・急ぎフラグを直接編集できます。",
-  "完了したタスクを表示するには、タスク一覧の「完了済み」トグルをクリックしてください。目のアイコンで表示/非表示を切り替えられます。",
-  "大分野やプロジェクトの名称を変更するには、項目にホバーして鉛筆アイコンをクリックするとインライン編集できます。",
-  "タスクの並び順は「登録順・期限順・急ぎ優先・未完了優先」の4種類から選べます。タスク一覧上部のソートバーで切り替えてください。",
-];
-
-let replyIndex = 0;
-function nextReply() {
-  const reply = MOCK_REPLIES[replyIndex % MOCK_REPLIES.length];
-  replyIndex++;
-  return reply;
+interface Props {
+  tasks: Task[];
+  projects: Project[];
+  domains: Domain[];
 }
 
-export default function FloatingAIChat() {
+export default function FloatingAIChat({ tasks, projects, domains }: Props) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -41,9 +30,9 @@ export default function FloatingAIChat() {
         setThinking(false);
         setMessages([{
           role: "ai",
-          text: "こんにちは！Daily Focus HQ のAIアシスタントです。\nタスク管理・プロジェクト・操作方法など、何でもお気軽にご相談ください。",
+          text: "こんにちは！Daily Focus HQ のAIアシスタントです。\n現在のタスクやプロジェクトの状況を把握しています。優先順位・進め方・操作方法など、何でもお気軽にご相談ください。",
         }]);
-      }, 700);
+      }, 500);
     }
     if (open) {
       setTimeout(() => inputRef.current?.focus(), 150);
@@ -54,16 +43,35 @@ export default function FloatingAIChat() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, thinking]);
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     if (!input.trim() || thinking) return;
+
     const userMsg: Message = { role: "user", text: input.trim() };
-    setMessages((prev) => [...prev, userMsg]);
+    const newMessages = [...messages, userMsg];
+    setMessages(newMessages);
     setInput("");
     setThinking(true);
-    setTimeout(() => {
+
+    try {
+      const res = await fetch("/api/ai-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: newMessages,
+          tasks,
+          projects,
+          domains,
+        }),
+      });
+
+      const data = await res.json();
+      const replyText = data.text ?? data.error ?? "応答を取得できませんでした。";
+      setMessages((prev) => [...prev, { role: "ai", text: replyText }]);
+    } catch {
+      setMessages((prev) => [...prev, { role: "ai", text: "通信エラーが発生しました。しばらく待ってから再試行してください。" }]);
+    } finally {
       setThinking(false);
-      setMessages((prev) => [...prev, { role: "ai", text: nextReply() }]);
-    }, 1200);
+    }
   };
 
   return (
@@ -183,8 +191,6 @@ const s: Record<string, React.CSSProperties> = {
     alignItems: "flex-end",
     gap: 12,
   },
-
-  // パネル
   panel: {
     width: 340,
     height: 480,
@@ -245,8 +251,6 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: 14,
     color: "var(--color-text-secondary)",
   },
-
-  // メッセージ
   messageList: {
     flex: 1,
     overflowY: "auto" as const,
@@ -289,8 +293,6 @@ const s: Record<string, React.CSSProperties> = {
     alignItems: "center",
     flexWrap: "wrap" as const,
   },
-
-  // 入力
   inputRow: {
     display: "flex",
     gap: 6,
@@ -324,8 +326,6 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: 15,
     flexShrink: 0,
   },
-
-  // FABボタン
   fab: {
     width: 52,
     height: 52,
@@ -344,8 +344,6 @@ const s: Record<string, React.CSSProperties> = {
   fabOpen: {
     background: "var(--color-text-secondary)",
   },
-
-  // タイピングドット（globals.cssのbounceアニメーション使用）
   dot1: { width: 6, height: 6, borderRadius: "50%", background: "var(--color-text-tertiary)", display: "inline-block", animation: "bounce 1.2s infinite", animationDelay: "0s" },
   dot2: { width: 6, height: 6, borderRadius: "50%", background: "var(--color-text-tertiary)", display: "inline-block", animation: "bounce 1.2s infinite", animationDelay: "0.2s" },
   dot3: { width: 6, height: 6, borderRadius: "50%", background: "var(--color-text-tertiary)", display: "inline-block", animation: "bounce 1.2s infinite", animationDelay: "0.4s" },

@@ -118,7 +118,7 @@ export default function DailyFocusHQ() {
         onUpdateTask={handleUpdateTask}
         onDeleteTask={handleDeleteTask}
       />
-      <FloatingAIChat />
+      <FloatingAIChat tasks={tasks} projects={projects} domains={domains} />
     </div>
   );
 }
