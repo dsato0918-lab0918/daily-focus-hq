@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
-import { initialDomains, initialProjects, initialTasks, DOMAIN_COLOR_PRESETS, DOMAIN_ICONS } from "@/lib/data";
+import { initialDomains, DOMAIN_COLOR_PRESETS, DOMAIN_ICONS } from "@/lib/data";
 import type { Domain, DomainKey, Project, Task } from "@/lib/types";
 import DomainPane from "./DomainPane";
 import ProjectPane from "./ProjectPane";
@@ -20,33 +20,67 @@ const MOBILE_NAV_ITEMS = [
 const isMobileWidth = () =>
   typeof window !== "undefined" && window.innerWidth < 768;
 
+// ── API ヘルパー ─────────────────────────────────────────────
+async function api(path: string, method = "GET", body?: unknown) {
+  const res = await fetch(path, {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : {},
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
 export default function DailyFocusHQ() {
-  const [domains, setDomains] = useState<Domain[]>(initialDomains);
-  const [projects, setProjects] = useState<Project[]>(initialProjects);
-  const [tasks, setTasks] = useState<Task[]>(initialTasks);
+  const [domains,  setDomains]  = useState<Domain[]>(initialDomains);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [tasks,    setTasks]    = useState<Task[]>([]);
+  const [loading,  setLoading]  = useState(true);
+  const [error,    setError]    = useState<string | null>(null);
 
-  const [curDomain, setCurDomain] = useState<DomainKey>("all");
-  const [curProjId, setCurProjId] = useState<string | null>(null);
-  const [selTaskId, setSelTaskId] = useState<string | null>(null);
-
-  // モバイルのアクティブペイン
+  const [curDomain,      setCurDomain]      = useState<DomainKey>("all");
+  const [curProjId,      setCurProjId]      = useState<string | null>(null);
+  const [selTaskId,      setSelTaskId]      = useState<string | null>(null);
   const [activeMobilePane, setActiveMobilePane] = useState<MobilePane>("tasks");
 
   // クイックタスク追加（モバイル専用）
   const [showQuickAdd, setShowQuickAdd] = useState(false);
-  const [qaTitle, setQaTitle]   = useState("");
+  const [qaTitle,  setQaTitle]  = useState("");
   const [qaProjId, setQaProjId] = useState<string>("");
-  const [qaDue, setQaDue]       = useState("");
+  const [qaDue,    setQaDue]    = useState("");
   const qaInputRef = useRef<HTMLInputElement>(null);
 
-  const projMap = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
-  const selTask = useMemo(() => tasks.find((t) => t.id === selTaskId) ?? null, [tasks, selTaskId]);
+  // メモ保存デバウンス用
+  const memoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const projMap   = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
+  const selTask   = useMemo(() => tasks.find((t) => t.id === selTaskId) ?? null, [tasks, selTaskId]);
   const selProject = useMemo(() => (selTask ? projMap.get(selTask.projId) ?? null : null), [selTask, projMap]);
+
+  // ── 初期データ読み込み ────────────────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    api("/api/notion/data")
+      .then(({ projects: p, tasks: t }) => {
+        if (!cancelled) {
+          setProjects(p ?? []);
+          setTasks(t ?? []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setError("Notionからデータを読み込めませんでした");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   // ── 選択系 ────────────────────────────────────────────────────
   const handleSelectDomain = useCallback((domain: DomainKey) => {
     setCurDomain(domain); setCurProjId(null); setSelTaskId(null);
-    // モバイルではナビペインに留まる（セクション選択後にプロジェクトを絞り込む）
   }, []);
 
   const handleSelectProj = useCallback((projId: string | null) => {
@@ -61,24 +95,54 @@ export default function DailyFocusHQ() {
 
   // ── タスク操作 ────────────────────────────────────────────────
   const handleToggleDone = useCallback((id: string) => {
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
+    setTasks((prev) => {
+      const task = prev.find((t) => t.id === id);
+      if (!task) return prev;
+      const done = !task.done;
+      api(`/api/notion/tasks/${id}`, "PATCH", { done }).catch(console.error);
+      return prev.map((t) => (t.id === id ? { ...t, done } : t));
+    });
   }, []);
+
   const handleMemoChange = useCallback((id: string, memo: string) => {
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, memo } : t)));
+    // デバウンス: 1秒後にNotion保存
+    if (memoTimer.current) clearTimeout(memoTimer.current);
+    memoTimer.current = setTimeout(() => {
+      api(`/api/notion/tasks/${id}`, "PATCH", { memo }).catch(console.error);
+    }, 1000);
   }, []);
-  const handleAddTask = useCallback((title: string, projId: string, due: string, urgent: boolean) => {
-    const newTask: Task = { id: `task_${Date.now()}`, projId, title, due, urgent, done: false, memo: "" };
-    setTasks((prev) => [...prev, newTask]);
-    setSelTaskId(newTask.id);
+
+  const handleAddTask = useCallback(async (title: string, projId: string, due: string, urgent: boolean) => {
+    // 仮IDでUI即反映
+    const tempId = `temp_${Date.now()}`;
+    const tempTask: Task = { id: tempId, projId, title, due, urgent, done: false, memo: "" };
+    setTasks((prev) => [...prev, tempTask]);
+    setSelTaskId(tempId);
     if (isMobileWidth()) setActiveMobilePane("detail");
+
+    try {
+      const created: Task = await api("/api/notion/tasks", "POST", { projId, title, due, urgent, done: false, memo: "" });
+      // 仮IDを実際のIDに置換
+      setTasks((prev) => prev.map((t) => (t.id === tempId ? created : t)));
+      setSelTaskId(created.id);
+    } catch {
+      // 失敗時は仮タスクを削除
+      setTasks((prev) => prev.filter((t) => t.id !== tempId));
+      setSelTaskId(null);
+    }
   }, []);
+
   const handleUpdateTask = useCallback((id: string, updates: Partial<Task>) => {
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)));
+    api(`/api/notion/tasks/${id}`, "PATCH", updates).catch(console.error);
   }, []);
+
   const handleDeleteTask = useCallback((id: string) => {
     setTasks((prev) => prev.filter((t) => t.id !== id));
     setSelTaskId((cur) => (cur === id ? null : cur));
     if (isMobileWidth()) setActiveMobilePane("tasks");
+    api(`/api/notion/tasks/${id}`, "DELETE").catch(console.error);
   }, []);
 
   // ── クイック追加（モバイル専用） ──────────────────────────────
@@ -99,28 +163,44 @@ export default function DailyFocusHQ() {
   }, [qaTitle, qaProjId, qaDue, handleAddTask]);
 
   // ── プロジェクト操作 ──────────────────────────────────────────
-  const handleAddProject = useCallback((name: string, domain: DomainKey) => {
-    setProjects((prev) => [...prev, { id: `proj_${Date.now()}`, domain, name, status: "g" }]);
+  const handleAddProject = useCallback(async (name: string, domain: DomainKey) => {
+    const tempId = `temp_proj_${Date.now()}`;
+    const tempProj: Project = { id: tempId, domain, name, status: "g" };
+    setProjects((prev) => [...prev, tempProj]);
+    try {
+      const created: Project = await api("/api/notion/projects", "POST", { name, domain, status: "g", archived: false });
+      setProjects((prev) => prev.map((p) => (p.id === tempId ? created : p)));
+    } catch {
+      setProjects((prev) => prev.filter((p) => p.id !== tempId));
+    }
   }, []);
+
   const handleUpdateProject = useCallback((id: string, updates: Partial<Project>) => {
     setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, ...updates } : p)));
+    api(`/api/notion/projects/${id}`, "PATCH", updates).catch(console.error);
   }, []);
+
   const handleDeleteProject = useCallback((id: string) => {
     setTasks((prev) => prev.filter((t) => t.projId !== id));
     setProjects((prev) => prev.filter((p) => p.id !== id));
     setCurProjId((cur) => (cur === id ? null : cur));
     setSelTaskId(null);
+    api(`/api/notion/projects/${id}`, "DELETE").catch(console.error);
   }, []);
+
   const handleArchiveProject = useCallback((id: string) => {
     setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, archived: true } : p)));
     setCurProjId((cur) => (cur === id ? null : cur));
     setSelTaskId(null);
-  }, []);
-  const handleRestoreProject = useCallback((id: string) => {
-    setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, archived: false } : p)));
+    api(`/api/notion/projects/${id}`, "PATCH", { archived: true }).catch(console.error);
   }, []);
 
-  // ── セクション操作 ────────────────────────────────────────────
+  const handleRestoreProject = useCallback((id: string) => {
+    setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, archived: false } : p)));
+    api(`/api/notion/projects/${id}`, "PATCH", { archived: false }).catch(console.error);
+  }, []);
+
+  // ── セクション操作（ローカルのみ） ────────────────────────────
   const handleAddDomain = useCallback((name: string) => {
     setDomains((prev) => {
       const preset = DOMAIN_COLOR_PRESETS[prev.length % DOMAIN_COLOR_PRESETS.length];
@@ -128,9 +208,11 @@ export default function DailyFocusHQ() {
       return [...prev, { id: `domain_${Date.now()}`, label: name, icon, bgColor: preset.bgColor, textColor: preset.textColor }];
     });
   }, []);
+
   const handleUpdateDomain = useCallback((id: string, label: string) => {
     setDomains((prev) => prev.map((d) => (d.id === id ? { ...d, label } : d)));
   }, []);
+
   const handleDeleteDomain = useCallback((id: string) => {
     const projIds = projects.filter((p) => p.domain === id).map((p) => p.id);
     setTasks((prev) => prev.filter((t) => !projIds.includes(t.projId)));
@@ -173,12 +255,41 @@ export default function DailyFocusHQ() {
     onDeleteTask: handleDeleteTask,
   };
 
+  // ── ローディング / エラー画面 ─────────────────────────────────
+  if (loading) {
+    return (
+      <div style={styles.center}>
+        <div style={styles.loadingBox}>
+          <i className="ti ti-loader-2" style={{ fontSize: 32, animation: "spin 1s linear infinite" }} />
+          <div style={{ marginTop: 12, color: "var(--color-text-secondary)", fontSize: 13 }}>
+            Notionからデータを読み込み中...
+          </div>
+        </div>
+        <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={styles.center}>
+        <div style={styles.errorBox}>
+          <i className="ti ti-alert-triangle" style={{ fontSize: 28, color: "var(--color-dot-red)" }} />
+          <div style={{ marginTop: 10, fontWeight: 600 }}>{error}</div>
+          <button
+            style={styles.retryBtn}
+            onClick={() => window.location.reload()}
+          >
+            再読み込み
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
-      {/* ════════════════════════════════════════
-          デスクトップレイアウト（変更なし）
-          CSS: .desktop-layout → 768px以下で display:none
-      ════════════════════════════════════════ */}
+      {/* デスクトップレイアウト */}
       <div className="desktop-layout" style={styles.desktopContainer}>
         <DomainPane  {...domainProps}  />
         <ProjectPane {...projectProps} />
@@ -186,13 +297,8 @@ export default function DailyFocusHQ() {
         <DetailPane  {...detailProps}  />
       </div>
 
-      {/* ════════════════════════════════════════
-          モバイルレイアウト（768px以下で表示）
-          CSS: .mobile-layout → 768px以上で display:none
-      ════════════════════════════════════════ */}
+      {/* モバイルレイアウト */}
       <div className="mobile-layout">
-
-        {/* メインコンテンツエリア */}
         <div className="mobile-content">
           {activeMobilePane === "nav" && (
             <div className="mobile-nav-pane">
@@ -204,11 +310,10 @@ export default function DailyFocusHQ() {
               </div>
             </div>
           )}
-          {activeMobilePane === "tasks" && <TaskPane {...taskProps} />}
+          {activeMobilePane === "tasks"  && <TaskPane   {...taskProps}   />}
           {activeMobilePane === "detail" && <DetailPane {...detailProps} />}
         </div>
 
-        {/* ボトムナビゲーション */}
         <nav className="mobile-bottom-nav">
           {MOBILE_NAV_ITEMS.map(({ key, icon, label }) => (
             <button
@@ -225,30 +330,21 @@ export default function DailyFocusHQ() {
 
       <FloatingAIChat tasks={tasks} projects={projects} domains={domains} />
 
-      {/* ════════════════════════════════════════
-          モバイル専用: クイックタスク追加FAB＋ボトムシート
-      ════════════════════════════════════════ */}
+      {/* モバイル専用: クイックタスク追加FAB＋ボトムシート */}
       <button
         className="mobile-fab-quickadd"
         onClick={() => setShowQuickAdd(true)}
         aria-label="タスクを追加"
-        title="タスクを追加"
       >
         <i className="ti ti-plus" style={{ fontSize: 22 }} aria-hidden="true" />
       </button>
 
       {showQuickAdd && (
         <>
-          {/* バックドロップ */}
-          <div
-            className="mobile-qa-backdrop"
-            onClick={() => setShowQuickAdd(false)}
-          />
-          {/* ボトムシート */}
+          <div className="mobile-qa-backdrop" onClick={() => setShowQuickAdd(false)} />
           <div className="mobile-qa-panel">
             <div className="mobile-qa-handle" />
             <div className="mobile-qa-title">タスクを追加</div>
-
             <input
               ref={qaInputRef}
               className="mobile-qa-input"
@@ -260,7 +356,6 @@ export default function DailyFocusHQ() {
                 if (e.key === "Escape") setShowQuickAdd(false);
               }}
             />
-
             <select
               className="mobile-qa-input"
               value={qaProjId}
@@ -270,14 +365,12 @@ export default function DailyFocusHQ() {
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
-
             <input
               className="mobile-qa-input"
               type="date"
               value={qaDue}
               onChange={(e) => setQaDue(e.target.value)}
             />
-
             <div className="mobile-qa-actions">
               <button className="mobile-qa-cancel" onClick={() => setShowQuickAdd(false)}>
                 キャンセル
@@ -304,5 +397,39 @@ const styles: Record<string, React.CSSProperties> = {
     width: "100vw",
     overflow: "hidden",
     background: "var(--color-bg)",
+  },
+  center: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    height: "100vh",
+    background: "var(--color-bg)",
+  },
+  loadingBox: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 4,
+  },
+  errorBox: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 8,
+    padding: "32px 24px",
+    background: "var(--color-bg-secondary)",
+    borderRadius: 12,
+    border: "0.5px solid var(--color-border-mid)",
+  },
+  retryBtn: {
+    marginTop: 8,
+    padding: "8px 20px",
+    borderRadius: 8,
+    border: "none",
+    background: "var(--color-text-primary)",
+    color: "var(--color-bg)",
+    fontSize: 13,
+    fontFamily: "inherit",
+    cursor: "pointer",
   },
 };
