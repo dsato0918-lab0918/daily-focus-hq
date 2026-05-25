@@ -1,12 +1,35 @@
-import { Client } from "@notionhq/client";
 import type { Project, Task } from "./types";
 
-export const notion = new Client({
-  auth: process.env.NOTION_TOKEN,
-});
+const NOTION_API = "https://api.notion.com/v1";
+const NOTION_VERSION = "2022-06-28";
 
-const PROJECTS_DB = process.env.NOTION_PROJECTS_DB_ID!;
-const TASKS_DB    = process.env.NOTION_TASKS_DB_ID!;
+// ── Notion REST API 直接呼び出し ─────────────────────────────
+
+async function notionFetch(
+  path: string,
+  method = "GET",
+  body?: unknown
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<any> {
+  const token = process.env.NOTION_TOKEN;
+  const res = await fetch(`${NOTION_API}${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Notion-Version": NOTION_VERSION,
+      "Content-Type": "application/json",
+    },
+    body: body ? JSON.stringify(body) : undefined,
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(
+      err.message ?? `Notion API error: ${res.status} ${path}`
+    );
+  }
+  return res.json();
+}
 
 // ── ページプロパティのヘルパー ────────────────────────────────
 
@@ -66,40 +89,36 @@ export function pageToTask(page: any): Task {
   };
 }
 
-// ── 全データ取得（v5: dataSources.query） ────────────────────
+// ── 全データ取得 ─────────────────────────────────────────────
 
 export async function fetchAllProjects(): Promise<Project[]> {
+  const dbId = process.env.NOTION_PROJECTS_DB_ID;
   const results: Project[] = [];
   let cursor: string | undefined;
   do {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res = await (notion.dataSources as any).query({
-      data_source_id: PROJECTS_DB,
-      ...(cursor ? { start_cursor: cursor } : {}),
-      page_size: 100,
-    });
+    const body: Record<string, unknown> = { page_size: 100 };
+    if (cursor) body.start_cursor = cursor;
+    const res = await notionFetch(`/databases/${dbId}/query`, "POST", body);
     for (const page of res.results ?? []) {
       results.push(pageToProject(page));
     }
-    cursor = res.has_more ? (res.next_cursor ?? undefined) : undefined;
+    cursor = res.has_more ? res.next_cursor : undefined;
   } while (cursor);
   return results;
 }
 
 export async function fetchAllTasks(): Promise<Task[]> {
+  const dbId = process.env.NOTION_TASKS_DB_ID;
   const results: Task[] = [];
   let cursor: string | undefined;
   do {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res = await (notion.dataSources as any).query({
-      data_source_id: TASKS_DB,
-      ...(cursor ? { start_cursor: cursor } : {}),
-      page_size: 100,
-    });
+    const body: Record<string, unknown> = { page_size: 100 };
+    if (cursor) body.start_cursor = cursor;
+    const res = await notionFetch(`/databases/${dbId}/query`, "POST", body);
     for (const page of res.results ?? []) {
       results.push(pageToTask(page));
     }
-    cursor = res.has_more ? (res.next_cursor ?? undefined) : undefined;
+    cursor = res.has_more ? res.next_cursor : undefined;
   } while (cursor);
   return results;
 }
@@ -107,41 +126,35 @@ export async function fetchAllTasks(): Promise<Task[]> {
 // ── プロジェクト CRUD ────────────────────────────────────────
 
 export async function createProject(data: Omit<Project, "id">): Promise<Project> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const page = await notion.pages.create({
-    parent: { database_id: PROJECTS_DB },
+  const page = await notionFetch("/pages", "POST", {
+    parent: { database_id: process.env.NOTION_PROJECTS_DB_ID },
     properties: {
       "名前":     { title: [{ text: { content: data.name } }] },
       "セクション": { select: { name: data.domain } },
       "ステータス": { select: { name: data.status } },
       "アーカイブ": { checkbox: data.archived ?? false },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any,
+    },
   });
   return pageToProject(page);
 }
 
 export async function updateProject(id: string, data: Partial<Project>): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const props: Record<string, any> = {};
+  const props: Record<string, unknown> = {};
   if (data.name     !== undefined) props["名前"]     = { title: [{ text: { content: data.name } }] };
   if (data.domain   !== undefined) props["セクション"] = { select: { name: data.domain } };
   if (data.status   !== undefined) props["ステータス"] = { select: { name: data.status } };
   if (data.archived !== undefined) props["アーカイブ"] = { checkbox: data.archived };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await notion.pages.update({ page_id: id, properties: props as any });
+  await notionFetch(`/pages/${id}`, "PATCH", { properties: props });
 }
 
 export async function deleteProject(id: string): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (notion.pages as any).update({ page_id: id, in_trash: true });
+  await notionFetch(`/pages/${id}`, "PATCH", { in_trash: true });
 }
 
 // ── タスク CRUD ──────────────────────────────────────────────
 
 export async function createTask(data: Omit<Task, "id">): Promise<Task> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const props: Record<string, any> = {
+  const props: Record<string, unknown> = {
     "タイトル":     { title: [{ text: { content: data.title } }] },
     "期日":         { rich_text: [{ text: { content: data.due } }] },
     "急ぎ":         { checkbox: data.urgent },
@@ -153,17 +166,15 @@ export async function createTask(data: Omit<Task, "id">): Promise<Task> {
   if (data.projId) {
     props["プロジェクト"] = { relation: [{ id: data.projId }] };
   }
-  const page = await notion.pages.create({
-    parent: { database_id: TASKS_DB },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    properties: props as any,
+  const page = await notionFetch("/pages", "POST", {
+    parent: { database_id: process.env.NOTION_TASKS_DB_ID },
+    properties: props,
   });
   return pageToTask(page);
 }
 
 export async function updateTask(id: string, data: Partial<Task>): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const props: Record<string, any> = {};
+  const props: Record<string, unknown> = {};
   if (data.title          !== undefined) props["タイトル"]     = { title: [{ text: { content: data.title } }] };
   if (data.due            !== undefined) props["期日"]         = { rich_text: [{ text: { content: data.due } }] };
   if (data.urgent         !== undefined) props["急ぎ"]         = { checkbox: data.urgent };
@@ -172,11 +183,9 @@ export async function updateTask(id: string, data: Partial<Task>): Promise<void>
   if (data.staffRequested !== undefined) props["スタッフ依頼済"] = { checkbox: data.staffRequested };
   if (data.vendorRequested!== undefined) props["業者依頼済"]   = { checkbox: data.vendorRequested };
   if (data.projId         !== undefined) props["プロジェクト"] = { relation: [{ id: data.projId }] };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await notion.pages.update({ page_id: id, properties: props as any });
+  await notionFetch(`/pages/${id}`, "PATCH", { properties: props });
 }
 
 export async function deleteTask(id: string): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (notion.pages as any).update({ page_id: id, in_trash: true });
+  await notionFetch(`/pages/${id}`, "PATCH", { in_trash: true });
 }
