@@ -117,7 +117,7 @@ export default function ProjectPane({
           <input ref={editRef} style={s.inlineInput} value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
             onClick={(e) => e.stopPropagation()}
-            onKeyDown={(e) => { if (e.key === "Enter") confirmEdit(); if (e.key === "Escape") setEditingId(null); }}
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) confirmEdit(); if (e.key === "Escape") setEditingId(null); }}
             onBlur={confirmEdit}
           />
         ) : (
@@ -202,7 +202,7 @@ export default function ProjectPane({
         <div style={s.addForm}>
           <input ref={addRef} style={s.input} placeholder="プロジェクト名..." value={addName}
             onChange={(e) => setAddName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") confirmAdd(); if (e.key === "Escape") { setAdding(false); setAddName(""); } }} />
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) confirmAdd(); if (e.key === "Escape") { setAdding(false); setAddName(""); } }} />
           {curDomain === "all" && (
             <select style={{ ...s.input, marginBottom: 6 }} value={addDomainId} onChange={(e) => setAddDomainId(e.target.value)}>
               {domains.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}

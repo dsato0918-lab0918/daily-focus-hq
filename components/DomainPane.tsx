@@ -89,7 +89,7 @@ export default function DomainPane({ domains, projects, curDomain, onSelect, onA
                 onChange={(e) => setEditValue(e.target.value)}
                 onClick={(e) => e.stopPropagation()}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") confirmEdit();
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing) confirmEdit();
                   if (e.key === "Escape") setEditingId(null);
                 }}
                 onBlur={confirmEdit}
@@ -122,7 +122,7 @@ export default function DomainPane({ domains, projects, curDomain, onSelect, onA
       {adding ? (
         <div style={s.addForm}>
           <input ref={addRef} style={s.input} placeholder="セクション名..." value={addName} onChange={(e) => setAddName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") confirmAdd(); if (e.key === "Escape") { setAdding(false); setAddName(""); } }} />
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) confirmAdd(); if (e.key === "Escape") { setAdding(false); setAddName(""); } }} />
           <div style={s.formActions}>
             <button style={s.confirmBtn} onClick={confirmAdd}>追加</button>
             <button style={s.cancelBtn} onClick={() => { setAdding(false); setAddName(""); }}>キャンセル</button>

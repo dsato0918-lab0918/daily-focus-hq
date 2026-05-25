@@ -242,7 +242,7 @@ export default function DetailPane({ task, project, onMemoChange, onUpdateTask, 
             style={{ ...styles.memo, height: "auto", resize: "none", marginBottom: 10, padding: "4px 8px", fontSize: 14, fontWeight: 500 }}
             value={titleValue}
             onChange={(e) => setTitleValue(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") confirmEditTitle(); if (e.key === "Escape") setEditingTitle(false); }}
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) confirmEditTitle(); if (e.key === "Escape") setEditingTitle(false); }}
             onBlur={confirmEditTitle}
           />
         ) : (
