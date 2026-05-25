@@ -74,11 +74,12 @@ export async function fetchAllProjects(): Promise<Project[]> {
   do {
     const res = await notion.databases.query({
       database_id: PROJECTS_DB,
-      start_cursor: cursor,
+      ...(cursor ? { start_cursor: cursor } : {}),
       page_size: 100,
     });
     for (const page of res.results) {
-      results.push(pageToProject(page));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      results.push(pageToProject(page as any));
     }
     cursor = res.has_more ? (res.next_cursor ?? undefined) : undefined;
   } while (cursor);
@@ -91,11 +92,12 @@ export async function fetchAllTasks(): Promise<Task[]> {
   do {
     const res = await notion.databases.query({
       database_id: TASKS_DB,
-      start_cursor: cursor,
+      ...(cursor ? { start_cursor: cursor } : {}),
       page_size: 100,
     });
     for (const page of res.results) {
-      results.push(pageToTask(page));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      results.push(pageToTask(page as any));
     }
     cursor = res.has_more ? (res.next_cursor ?? undefined) : undefined;
   } while (cursor);
