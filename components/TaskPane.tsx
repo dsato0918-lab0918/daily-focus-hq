@@ -62,12 +62,17 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
 
 function sortTasks(tasks: Task[], key: SortKey): Task[] {
   const arr = [...tasks];
-  if (key === "due")    return arr.sort((a, b) => parseDueDate(a.due).getTime() - parseDueDate(b.due).getTime());
-  if (key === "urgent") return arr.sort((a, b) => {
+  // 完了タスクは常に末尾へ
+  const withDone = (sorted: Task[]) => [
+    ...sorted.filter((t) => !t.done),
+    ...sorted.filter((t) =>  t.done),
+  ];
+  if (key === "due")    return withDone(arr.sort((a, b) => parseDueDate(a.due).getTime() - parseDueDate(b.due).getTime()));
+  if (key === "urgent") return withDone(arr.sort((a, b) => {
     if (a.urgent !== b.urgent) return a.urgent ? -1 : 1;
     return parseDueDate(a.due).getTime() - parseDueDate(b.due).getTime();
-  });
-  return arr;
+  }));
+  return withDone(arr);
 }
 
 export default function TaskPane({ tasks, projects, domains, curDomain, curProjId, selTaskId, onSelectTask, onToggleDone, onAddTask, onUpdateTask, onDeleteTask }: Props) {

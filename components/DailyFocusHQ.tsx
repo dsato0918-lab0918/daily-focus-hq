@@ -421,7 +421,7 @@ export default function DailyFocusHQ() {
 
 const styles: Record<string, React.CSSProperties> = {
   desktopContainer: {
-    gridTemplateColumns: "180px 200px minmax(0, 1fr) 260px",
+    gridTemplateColumns: "2fr 2fr 6fr 2fr",
     height: "100vh",
     width: "100vw",
     overflow: "hidden",
