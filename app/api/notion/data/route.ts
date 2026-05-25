@@ -11,7 +11,8 @@ export async function GET() {
     ]);
     return NextResponse.json({ projects, tasks });
   } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
     console.error(e);
-    return NextResponse.json({ error: "Notion fetch failed" }, { status: 500 });
+    return NextResponse.json({ error: "Notion fetch failed", detail: msg }, { status: 500 });
   }
 }
