@@ -15,6 +15,7 @@ interface Props {
   onDeleteProject: (id: string) => void;
   onArchiveProject: (id: string) => void;
   onRestoreProject: (id: string) => void;
+  onReorderProjects: (fromId: string, toId: string) => void;
 }
 
 const STATUS_COLORS: Record<Project["status"], string> = {
@@ -27,7 +28,7 @@ const STATUS_LABELS: Record<Project["status"], string> = { g: "順調", a: "注�
 export default function ProjectPane({
   domains, projects, tasks, curDomain, curProjId,
   onSelect, onAddProject, onUpdateProject, onDeleteProject,
-  onArchiveProject, onRestoreProject,
+  onArchiveProject, onRestoreProject, onReorderProjects,
 }: Props) {
   const [adding, setAdding] = useState(false);
   const [addName, setAddName] = useState("");
@@ -37,6 +38,11 @@ export default function ProjectPane({
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  // ドラッグ&ドロップ
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [dragAtEnd, setDragAtEnd] = useState(false);
+  const lastDragEndMs = useRef(0);
   const addRef = useRef<HTMLInputElement>(null);
   const editRef = useRef<HTMLInputElement>(null);
 
@@ -90,15 +96,51 @@ export default function ProjectPane({
     const isEditing  = editingId === proj.id;
     const isConfirmingDelete = confirmDeleteId === proj.id;
     const taskCount  = taskCountMap.get(proj.id) ?? 0;
+    const isDragging = dragId === proj.id;
+    const isDragOver = dragOverId === proj.id && !dragAtEnd;
 
     return (
       <div
         key={proj.id}
-        style={{ ...s.row, background: isActive ? "var(--color-info-bg)" : isHovered ? "var(--color-bg-secondary)" : "transparent" }}
-        onClick={() => !isEditing && onSelect(isActive ? null : proj.id)}
+        draggable={!isEditing}
+        onDragStart={(e) => {
+          setDragId(proj.id);
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setData("text/plain", proj.id);
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          if (dragOverId !== proj.id) setDragOverId(proj.id);
+          setDragAtEnd(false);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          if (dragId && dragId !== proj.id) onReorderProjects(dragId, proj.id);
+          setDragId(null); setDragOverId(null); setDragAtEnd(false);
+        }}
+        onDragEnd={() => {
+          lastDragEndMs.current = Date.now();
+          setDragId(null); setDragOverId(null); setDragAtEnd(false);
+        }}
+        style={{
+          ...s.row,
+          background: isActive ? "var(--color-info-bg)" : isHovered ? "var(--color-bg-secondary)" : "transparent",
+          opacity: isDragging ? 0.4 : 1,
+          borderTop: isDragOver ? "2px solid var(--color-info-text)" : "2px solid transparent",
+        }}
+        onClick={() => {
+          if (Date.now() - lastDragEndMs.current < 200) return;
+          if (!isEditing) onSelect(isActive ? null : proj.id);
+        }}
         onMouseEnter={() => setHoveredId(proj.id)}
         onMouseLeave={() => setHoveredId(null)}
       >
+        {/* グリップハンドル */}
+        <i className="ti ti-grip-vertical"
+          style={{ cursor: isDragging ? "grabbing" : "grab", color: "var(--color-text-tertiary)", fontSize: 11, flexShrink: 0, opacity: isHovered || isDragging ? 0.6 : 0, transition: "opacity 0.15s" }}
+        />
+
         {/* ステータスドット（ホバー時はステータス変更ボタンに） */}
         {isHovered && !isEditing ? (
           <div style={s.statusBtns} onClick={(e) => e.stopPropagation()}>
@@ -196,6 +238,16 @@ export default function ProjectPane({
             return <div key={d.id}><div style={s.sectionLabel}>{d.label}</div>{filtered.map(renderProject)}</div>;
           })
         : visibleActive.map(renderProject)}
+
+      {/* ── 末尾ドロップゾーン ── */}
+      {dragId && (
+        <div
+          style={{ height: 10, borderTop: dragAtEnd ? "2px solid var(--color-info-text)" : "2px solid transparent", transition: "border-top 0.1s" }}
+          onDragOver={(e) => { e.preventDefault(); setDragAtEnd(true); setDragOverId(null); }}
+          onDragLeave={() => setDragAtEnd(false)}
+          onDrop={(e) => { e.preventDefault(); if (dragId) onReorderProjects(dragId, "__END__"); setDragId(null); setDragAtEnd(false); }}
+        />
+      )}
 
       {/* ── 追加フォーム / ボタン ── */}
       {adding ? (

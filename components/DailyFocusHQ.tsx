@@ -65,6 +65,17 @@ export default function DailyFocusHQ() {
     api("/api/notion/data")
       .then(({ projects: p, tasks: t }) => {
         if (!cancelled) {
+          // localStorageに保存された順序を適用
+          try {
+            const saved = localStorage.getItem("sugar-task-project-order");
+            if (saved) {
+              const order: string[] = JSON.parse(saved);
+              const orderMap = new Map(order.map((id, i) => [id, i]));
+              p = (p ?? []).sort((a: Project, b: Project) =>
+                (orderMap.get(a.id) ?? 99999) - (orderMap.get(b.id) ?? 99999)
+              );
+            }
+          } catch { /* ignore */ }
           setProjects(p ?? []);
           setTasks(t ?? []);
         }
@@ -200,6 +211,23 @@ export default function DailyFocusHQ() {
     api(`/api/notion/projects/${id}`, "PATCH", { archived: false }).catch(console.error);
   }, []);
 
+  const handleReorderProjects = useCallback((fromId: string, toId: string) => {
+    setProjects((prev) => {
+      const arr = [...prev];
+      const fromIdx = arr.findIndex((p) => p.id === fromId);
+      if (fromIdx === -1) return prev;
+      const [item] = arr.splice(fromIdx, 1);
+      if (toId === "__END__") {
+        arr.push(item);
+      } else {
+        const toIdx = arr.findIndex((p) => p.id === toId);
+        arr.splice(toIdx === -1 ? arr.length : toIdx, 0, item);
+      }
+      try { localStorage.setItem("sugar-task-project-order", JSON.stringify(arr.map((p) => p.id))); } catch { /* ignore */ }
+      return arr;
+    });
+  }, []);
+
   // ── セクション操作（ローカルのみ） ────────────────────────────
   const handleAddDomain = useCallback((name: string) => {
     setDomains((prev) => {
@@ -239,6 +267,7 @@ export default function DailyFocusHQ() {
     onDeleteProject: handleDeleteProject,
     onArchiveProject: handleArchiveProject,
     onRestoreProject: handleRestoreProject,
+    onReorderProjects: handleReorderProjects,
   };
   const taskProps = {
     tasks, projects, domains, curDomain, curProjId, selTaskId,
