@@ -86,14 +86,19 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
   const [projId, setProjId] = useState<string>("");
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
+  const [editingDue, setEditingDue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const editRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { if (editingTaskId) editRef.current?.focus(); }, [editingTaskId]);
 
-  const startEdit = (task: Task) => { setEditingTaskId(task.id); setEditingTitle(task.title); };
+  const startEdit = (task: Task) => {
+    setEditingTaskId(task.id);
+    setEditingTitle(task.title);
+    setEditingDue(task.due && task.due.includes("-") ? task.due : "");
+  };
   const confirmEdit = (id: string) => {
-    if (editingTitle.trim()) onUpdateTask(id, { title: editingTitle.trim() });
+    if (editingTitle.trim()) onUpdateTask(id, { title: editingTitle.trim(), due: editingDue });
     setEditingTaskId(null);
   };
   const cancelEdit = () => setEditingTaskId(null);
@@ -176,18 +181,44 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
 
         <div style={{ flex: 1, minWidth: 0 }}>
           {isEditing ? (
-            <input
-              ref={editRef}
-              style={styles.editInput}
-              value={editingTitle}
-              onChange={(e) => setEditingTitle(e.target.value)}
-              onClick={(e) => e.stopPropagation()}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.nativeEvent.isComposing) confirmEdit(task.id);
-                if (e.key === "Escape") cancelEdit();
-              }}
-              onBlur={() => confirmEdit(task.id)}
-            />
+            <div onClick={(e) => e.stopPropagation()}>
+              <input
+                ref={editRef}
+                style={styles.editInput}
+                value={editingTitle}
+                onChange={(e) => setEditingTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing) confirmEdit(task.id);
+                  if (e.key === "Escape") cancelEdit();
+                }}
+              />
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+                <i className="ti ti-calendar" style={{ fontSize: 11, color: "var(--color-text-tertiary)", flexShrink: 0 }} />
+                <input
+                  type="date"
+                  style={{ ...styles.editInput, marginBottom: 0, flex: 1 }}
+                  value={editingDue}
+                  onChange={(e) => setEditingDue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") confirmEdit(task.id);
+                    if (e.key === "Escape") cancelEdit();
+                  }}
+                />
+                {editingDue && (
+                  <button
+                    style={{ border: "none", background: "transparent", cursor: "pointer", padding: 0, color: "var(--color-text-tertiary)", lineHeight: 1 }}
+                    onClick={() => setEditingDue("")}
+                    title="期限をクリア"
+                  >
+                    <i className="ti ti-x" style={{ fontSize: 10 }} />
+                  </button>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 4, marginTop: 5 }}>
+                <button style={styles.editConfirmBtn} onClick={() => confirmEdit(task.id)}>保存</button>
+                <button style={styles.editCancelBtn} onClick={cancelEdit}>キャンセル</button>
+              </div>
+            </div>
           ) : (
             <div style={{ fontSize: 12.5, color: task.done ? "var(--color-text-tertiary)" : "var(--color-text-primary)", textDecoration: task.done ? "line-through" : "none", lineHeight: 1.4 }}>
               {task.title}
@@ -409,6 +440,8 @@ const styles: Record<string, React.CSSProperties> = {
   checkbox: { width: 15, height: 15, borderRadius: 3, border: "1.5px solid", flexShrink: 0, marginTop: 1, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
   rowIconBtn: { width: 22, height: 22, border: "none", borderRadius: 4, background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "var(--color-text-tertiary)", padding: 0 },
   editInput: { width: "100%", padding: "2px 6px", fontSize: 12.5, border: "0.5px solid var(--color-border-mid)", borderRadius: 4, background: "var(--color-bg)", color: "var(--color-text-primary)", outline: "none", fontFamily: "inherit", marginBottom: 2 },
+  editConfirmBtn: { flex: 1, padding: "3px 8px", fontSize: 11, fontWeight: 500, border: "0.5px solid var(--color-border-mid)", borderRadius: 4, background: "var(--color-info-bg)", color: "var(--color-info-text)", cursor: "pointer", fontFamily: "inherit" },
+  editCancelBtn:  { flex: 1, padding: "3px 8px", fontSize: 11, border: "0.5px solid var(--color-border)", borderRadius: 4, background: "transparent", color: "var(--color-text-secondary)", cursor: "pointer", fontFamily: "inherit" },
   chip: { fontSize: 10, padding: "1px 6px", borderRadius: 4, border: "0.5px solid var(--color-border)", color: "var(--color-text-secondary)", background: "transparent" },
   tagRemoveBtn: { border: "none", background: "transparent", cursor: "pointer", padding: 0, display: "inline-flex", alignItems: "center", color: "inherit", opacity: 0.6, lineHeight: 1 },
   sectionLabel: { padding: "6px 12px", fontSize: 10, fontWeight: 500, color: "var(--color-text-tertiary)", letterSpacing: "0.06em", textTransform: "uppercase" as const, background: "var(--color-bg-secondary)", borderBottom: "0.5px solid var(--color-border)" },
