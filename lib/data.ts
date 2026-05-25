@@ -26,7 +26,18 @@ export const initialTasks: Task[] = [];
 
 export function todayDue(): string {
   const d = new Date();
+  const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
-  return `${m}/${day}`;
+  return `${y}-${m}-${day}`;
+}
+
+/** "YYYY-MM-DD" → "M/D"、旧形式 "MM/DD" はそのまま返す */
+export function formatDueDisplay(due: string): string {
+  if (!due) return "";
+  if (due.includes("-")) {
+    const parts = due.split("-");
+    return `${parseInt(parts[1])}/${parseInt(parts[2])}`;
+  }
+  return due;
 }

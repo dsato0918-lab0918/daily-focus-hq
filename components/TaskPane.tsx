@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
-import { todayDue } from "@/lib/data";
+import { todayDue, formatDueDisplay } from "@/lib/data";
 import type { Domain, DomainKey, Project, Task } from "@/lib/types";
 
 interface Props {
@@ -18,6 +18,14 @@ interface Props {
   onDeleteTask: (id: string) => void;
 }
 
+function parseDueDate(due: string): Date {
+  if (!due) return new Date(9999, 11, 31);
+  if (due.includes("-")) return new Date(due + "T00:00:00");
+  // 旧形式 MM/DD
+  const [m, d] = due.split("/").map(Number);
+  return new Date(new Date().getFullYear(), (m || 12) - 1, d || 31);
+}
+
 function scoredFocus(tasks: Task[]): Task[] {
   const today = new Date();
   return [...tasks]
@@ -25,8 +33,7 @@ function scoredFocus(tasks: Task[]): Task[] {
     .map((t) => {
       let score = 0;
       if (t.urgent) score += 40;
-      const [m, d] = t.due.split("/").map(Number);
-      const due = new Date(today.getFullYear(), m - 1, d);
+      const due = parseDueDate(t.due);
       const diff = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       if (diff <= 0) score += 50;
       else if (diff === 1) score += 30;
@@ -53,17 +60,12 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "urgent",  label: "急ぎ優先" },
 ];
 
-function parseDue(due: string): number {
-  const [m, d] = due.split("/").map(Number);
-  return (m || 12) * 100 + (d || 31);
-}
-
 function sortTasks(tasks: Task[], key: SortKey): Task[] {
   const arr = [...tasks];
-  if (key === "due")    return arr.sort((a, b) => parseDue(a.due) - parseDue(b.due));
+  if (key === "due")    return arr.sort((a, b) => parseDueDate(a.due).getTime() - parseDueDate(b.due).getTime());
   if (key === "urgent") return arr.sort((a, b) => {
     if (a.urgent !== b.urgent) return a.urgent ? -1 : 1;
-    return parseDue(a.due) - parseDue(b.due);
+    return parseDueDate(a.due).getTime() - parseDueDate(b.due).getTime();
   });
   return arr;
 }
@@ -188,7 +190,7 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
           )}
           <div style={{ display: "flex", gap: 4, marginTop: 3, flexWrap: "wrap" }}>
             {task.urgent && !task.done && <span style={{ ...styles.chip, background: "#FCEBEB", color: "#A32D2D", border: "none" }}>急ぎ</span>}
-            <span style={styles.chip}>{task.due}</span>
+            {task.due && <span style={styles.chip}>{formatDueDisplay(task.due)}</span>}
             {proj && <span style={{ ...styles.chip, background: domColor.bg, color: domColor.color, border: "none" }}>{proj.name}</span>}
             {task.staffRequested && (
               <span style={{ ...styles.chip, background: "#F4ECF5", color: "#4A154B", border: "0.5px solid #C9A8CB", display: "inline-flex", alignItems: "center", gap: 3 }}>
@@ -272,9 +274,8 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
           />
           <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
             <input
-              type="text"
-              style={{ ...styles.input, marginBottom: 0, width: 80 }}
-              placeholder="MM/DD"
+              type="date"
+              style={{ ...styles.input, marginBottom: 0, flex: 1 }}
               value={due}
               onChange={(e) => setDue(e.target.value)}
             />
@@ -324,7 +325,7 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
             <span style={{ fontSize: 12.5 }}>{task.title}</span>
             <br />
             <span style={{ fontSize: 11, color: "var(--color-text-tertiary)" }}>
-              {proj?.name} · {task.due}{task.urgent ? " · 急ぎ" : ""}
+              {proj?.name} · {formatDueDisplay(task.due)}{task.urgent ? " · 急ぎ" : ""}
             </span>
           </div>
         </div>

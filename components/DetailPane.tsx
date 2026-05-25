@@ -282,12 +282,12 @@ export default function DetailPane({ task, project, onMemoChange, onUpdateTask, 
           )}
         </div>
 
-        {/* 期限（クリックで編集） */}
+        {/* 期限 */}
         <div style={styles.fieldLabel}>期限</div>
         <input
-          style={{ ...styles.memo, height: "auto", resize: "none", marginBottom: 14, padding: "4px 8px", fontSize: 13, width: 90 }}
-          value={task.due}
-          placeholder="MM/DD"
+          type="date"
+          style={{ ...styles.memo, height: "auto", resize: "none", marginBottom: 14, padding: "4px 8px", fontSize: 13, width: "100%" }}
+          value={task.due.includes("-") ? task.due : ""}
           onChange={(e) => onUpdateTask(task.id, { due: e.target.value })}
         />
 
