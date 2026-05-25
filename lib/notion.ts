@@ -66,20 +66,20 @@ export function pageToTask(page: any): Task {
   };
 }
 
-// ── 全データ取得 ─────────────────────────────────────────────
+// ── 全データ取得（v5: dataSources.query） ────────────────────
 
 export async function fetchAllProjects(): Promise<Project[]> {
   const results: Project[] = [];
   let cursor: string | undefined;
   do {
-    const res = await notion.databases.query({
-      database_id: PROJECTS_DB,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const res = await (notion.dataSources as any).query({
+      data_source_id: PROJECTS_DB,
       ...(cursor ? { start_cursor: cursor } : {}),
       page_size: 100,
     });
-    for (const page of res.results) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      results.push(pageToProject(page as any));
+    for (const page of res.results ?? []) {
+      results.push(pageToProject(page));
     }
     cursor = res.has_more ? (res.next_cursor ?? undefined) : undefined;
   } while (cursor);
@@ -90,14 +90,14 @@ export async function fetchAllTasks(): Promise<Task[]> {
   const results: Task[] = [];
   let cursor: string | undefined;
   do {
-    const res = await notion.databases.query({
-      database_id: TASKS_DB,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const res = await (notion.dataSources as any).query({
+      data_source_id: TASKS_DB,
       ...(cursor ? { start_cursor: cursor } : {}),
       page_size: 100,
     });
-    for (const page of res.results) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      results.push(pageToTask(page as any));
+    for (const page of res.results ?? []) {
+      results.push(pageToTask(page));
     }
     cursor = res.has_more ? (res.next_cursor ?? undefined) : undefined;
   } while (cursor);
@@ -107,6 +107,7 @@ export async function fetchAllTasks(): Promise<Task[]> {
 // ── プロジェクト CRUD ────────────────────────────────────────
 
 export async function createProject(data: Omit<Project, "id">): Promise<Project> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const page = await notion.pages.create({
     parent: { database_id: PROJECTS_DB },
     properties: {
@@ -114,7 +115,8 @@ export async function createProject(data: Omit<Project, "id">): Promise<Project>
       "セクション": { select: { name: data.domain } },
       "ステータス": { select: { name: data.status } },
       "アーカイブ": { checkbox: data.archived ?? false },
-    },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any,
   });
   return pageToProject(page);
 }
@@ -126,11 +128,13 @@ export async function updateProject(id: string, data: Partial<Project>): Promise
   if (data.domain   !== undefined) props["セクション"] = { select: { name: data.domain } };
   if (data.status   !== undefined) props["ステータス"] = { select: { name: data.status } };
   if (data.archived !== undefined) props["アーカイブ"] = { checkbox: data.archived };
-  await notion.pages.update({ page_id: id, properties: props });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await notion.pages.update({ page_id: id, properties: props as any });
 }
 
 export async function deleteProject(id: string): Promise<void> {
-  await notion.pages.update({ page_id: id, archived: true });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (notion.pages as any).update({ page_id: id, in_trash: true });
 }
 
 // ── タスク CRUD ──────────────────────────────────────────────
@@ -151,7 +155,8 @@ export async function createTask(data: Omit<Task, "id">): Promise<Task> {
   }
   const page = await notion.pages.create({
     parent: { database_id: TASKS_DB },
-    properties: props,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    properties: props as any,
   });
   return pageToTask(page);
 }
@@ -167,9 +172,11 @@ export async function updateTask(id: string, data: Partial<Task>): Promise<void>
   if (data.staffRequested !== undefined) props["スタッフ依頼済"] = { checkbox: data.staffRequested };
   if (data.vendorRequested!== undefined) props["業者依頼済"]   = { checkbox: data.vendorRequested };
   if (data.projId         !== undefined) props["プロジェクト"] = { relation: [{ id: data.projId }] };
-  await notion.pages.update({ page_id: id, properties: props });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await notion.pages.update({ page_id: id, properties: props as any });
 }
 
 export async function deleteTask(id: string): Promise<void> {
-  await notion.pages.update({ page_id: id, archived: true });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (notion.pages as any).update({ page_id: id, in_trash: true });
 }
