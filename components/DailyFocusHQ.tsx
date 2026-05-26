@@ -69,9 +69,9 @@ export default function DailyFocusHQ() {
     setLoading(true);
     setError(null);
     api("/api/notion/data")
-      .then(({ projects: p, tasks: t }) => {
+      .then(({ projects: p, tasks: t, domains: d }) => {
         if (!cancelled) {
-          // localStorageに保存された順序を適用
+          // localStorageに保存されたプロジェクト順序を適用
           try {
             const saved = localStorage.getItem("sugar-task-project-order");
             if (saved) {
@@ -84,6 +84,8 @@ export default function DailyFocusHQ() {
           } catch { /* ignore */ }
           setProjects(p ?? []);
           setTasks(t ?? []);
+          // Notion DB からドメインが取得できた場合は上書き
+          if (Array.isArray(d) && d.length > 0) setDomains(d);
         }
       })
       .catch(() => {
@@ -239,22 +241,23 @@ export default function DailyFocusHQ() {
     api(`/api/notion/projects/${id}`, "PATCH", { domain }).catch(console.error);
   }, []);
 
-  // domains が変わるたびに localStorage へ保存
-  useEffect(() => {
-    try { localStorage.setItem("sugar-task-domains", JSON.stringify(domains)); } catch { /* ignore */ }
-  }, [domains]);
-
-  // ── セクション操作（ローカルのみ） ────────────────────────────
+  // ── セクション操作（Notion連携） ────────────────────────────
   const handleAddDomain = useCallback((name: string) => {
-    setDomains((prev) => {
-      const preset = DOMAIN_COLOR_PRESETS[prev.length % DOMAIN_COLOR_PRESETS.length];
-      const icon = DOMAIN_ICONS[(prev.length + 3) % DOMAIN_ICONS.length];
-      return [...prev, { id: `domain_${Date.now()}`, label: name, icon, bgColor: preset.bgColor, textColor: preset.textColor }];
-    });
-  }, []);
+    const tempId = `domain_temp_${Date.now()}`;
+    const preset = DOMAIN_COLOR_PRESETS[domains.length % DOMAIN_COLOR_PRESETS.length];
+    const icon   = DOMAIN_ICONS[(domains.length + 3) % DOMAIN_ICONS.length];
+    const newDomain = { id: tempId, label: name, icon, bgColor: preset.bgColor, textColor: preset.textColor };
+    setDomains((prev) => [...prev, newDomain]);
+    api("/api/notion/domains", "POST", { label: name, icon, bgColor: preset.bgColor, textColor: preset.textColor, order: domains.length })
+      .then((created: Domain) => {
+        setDomains((prev) => prev.map((d) => d.id === tempId ? created : d));
+      })
+      .catch(console.error);
+  }, [domains]);
 
   const handleUpdateDomain = useCallback((id: string, label: string) => {
     setDomains((prev) => prev.map((d) => (d.id === id ? { ...d, label } : d)));
+    api(`/api/notion/domains/${id}`, "PATCH", { label }).catch(console.error);
   }, []);
 
   const handleDeleteDomain = useCallback((id: string) => {
@@ -265,6 +268,7 @@ export default function DailyFocusHQ() {
     setCurDomain((cur) => (cur === id ? "all" : cur));
     setCurProjId(null);
     setSelTaskId(null);
+    api(`/api/notion/domains/${id}`, "DELETE").catch(console.error);
   }, [projects]);
 
   // ── 共通 props ───────────────────────────────────────────────

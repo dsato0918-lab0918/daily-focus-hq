@@ -1,4 +1,4 @@
-import type { Project, Task } from "./types";
+import type { Project, Task, Domain } from "./types";
 
 const NOTION_API = "https://api.notion.com/v1";
 const NOTION_VERSION = "2022-06-28";
@@ -187,5 +187,74 @@ export async function updateTask(id: string, data: Partial<Task>): Promise<void>
 }
 
 export async function deleteTask(id: string): Promise<void> {
+  await notionFetch(`/pages/${id}`, "PATCH", { in_trash: true });
+}
+
+// ── ドメイン変換 ─────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function pageToDomain(page: any): Domain {
+  const p = page.properties;
+  return {
+    id:        page.id,
+    label:     getText(p["名前"]),
+    icon:      getText(p["アイコン"]) || "ti-layout-grid",
+    bgColor:   getText(p["背景色"])  || "#E6F1FB",
+    textColor: getText(p["文字色"]) || "#185FA5",
+  };
+}
+
+// ── ドメイン全件取得 ─────────────────────────────────────────
+
+export async function fetchAllDomains(): Promise<Domain[]> {
+  const dbId = process.env.NOTION_DOMAINS_DB_ID;
+  if (!dbId) return [];
+  const results: Domain[] = [];
+  let cursor: string | undefined;
+  do {
+    const body: Record<string, unknown> = {
+      page_size: 100,
+      sorts: [{ property: "順序", direction: "ascending" }],
+    };
+    if (cursor) body.start_cursor = cursor;
+    const res = await notionFetch(`/databases/${dbId}/query`, "POST", body);
+    for (const page of res.results ?? []) results.push(pageToDomain(page));
+    cursor = res.has_more ? res.next_cursor : undefined;
+  } while (cursor);
+  return results;
+}
+
+// ── ドメイン CRUD ────────────────────────────────────────────
+
+export async function createDomain(data: {
+  label: string; icon: string; bgColor: string; textColor: string; order: number;
+}): Promise<Domain> {
+  const page = await notionFetch("/pages", "POST", {
+    parent: { database_id: process.env.NOTION_DOMAINS_DB_ID },
+    properties: {
+      "名前":    { title:     [{ text: { content: data.label } }] },
+      "アイコン": { rich_text: [{ text: { content: data.icon } }] },
+      "背景色":  { rich_text: [{ text: { content: data.bgColor } }] },
+      "文字色":  { rich_text: [{ text: { content: data.textColor } }] },
+      "順序":    { number: data.order },
+    },
+  });
+  return pageToDomain(page);
+}
+
+export async function updateDomain(
+  id: string,
+  data: Partial<{ label: string; icon: string; bgColor: string; textColor: string; order: number }>
+): Promise<void> {
+  const props: Record<string, unknown> = {};
+  if (data.label     !== undefined) props["名前"]    = { title:     [{ text: { content: data.label } }] };
+  if (data.icon      !== undefined) props["アイコン"] = { rich_text: [{ text: { content: data.icon } }] };
+  if (data.bgColor   !== undefined) props["背景色"]  = { rich_text: [{ text: { content: data.bgColor } }] };
+  if (data.textColor !== undefined) props["文字色"]  = { rich_text: [{ text: { content: data.textColor } }] };
+  if (data.order     !== undefined) props["順序"]    = { number: data.order };
+  await notionFetch(`/pages/${id}`, "PATCH", { properties: props });
+}
+
+export async function deleteDomain(id: string): Promise<void> {
   await notionFetch(`/pages/${id}`, "PATCH", { in_trash: true });
 }

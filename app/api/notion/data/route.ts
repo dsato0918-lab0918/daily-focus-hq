@@ -1,35 +1,26 @@
 import { NextResponse } from "next/server";
-import { fetchAllProjects, fetchAllTasks } from "@/lib/notion";
+import { fetchAllProjects, fetchAllTasks, fetchAllDomains } from "@/lib/notion";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  // 環境変数デバッグ
   const projDb = process.env.NOTION_PROJECTS_DB_ID;
   const taskDb = process.env.NOTION_TASKS_DB_ID;
   const token  = process.env.NOTION_TOKEN;
-  console.log("PROJECTS_DB:", projDb);
-  console.log("TASKS_DB:", taskDb);
-  console.log("TOKEN set:", !!token);
 
   if (!projDb || !taskDb || !token) {
-    return NextResponse.json({
-      error: "Env vars missing",
-      NOTION_PROJECTS_DB_ID: projDb ?? "MISSING",
-      NOTION_TASKS_DB_ID: taskDb ?? "MISSING",
-      NOTION_TOKEN: token ? "set" : "MISSING",
-    }, { status: 500 });
+    return NextResponse.json({ error: "Env vars missing" }, { status: 500 });
   }
 
   try {
-    const [projects, tasks] = await Promise.all([
+    const [projects, tasks, domains] = await Promise.all([
       fetchAllProjects(),
       fetchAllTasks(),
+      fetchAllDomains(), // NOTION_DOMAINS_DB_ID 未設定なら [] を返す
     ]);
-    return NextResponse.json({ projects, tasks });
+    return NextResponse.json({ projects, tasks, domains });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error(e);
     return NextResponse.json({ error: "Notion fetch failed", detail: msg }, { status: 500 });
   }
 }
