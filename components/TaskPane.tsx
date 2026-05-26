@@ -106,12 +106,11 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
 
   const projMap = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
 
-  // Determine which projects are selectable in the add form
-  const selectableProjects = useMemo(() => {
-    if (curProjId) return projects.filter((p) => p.id === curProjId);
-    if (curDomain !== "all") return projects.filter((p) => p.domain === curDomain);
-    return projects;
-  }, [projects, curDomain, curProjId]);
+  // タスク追加フォームで選択できるプロジェクト（常に全アクティブPJ）
+  const selectableProjects = useMemo(
+    () => projects.filter((p) => !p.archived),
+    [projects]
+  );
 
   useEffect(() => {
     if (adding) {
@@ -336,11 +335,9 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
               急ぎ
             </label>
           </div>
-          {!curProjId && (
-            <select style={{ ...styles.input, marginBottom: 6 }} value={projId} onChange={(e) => setProjId(e.target.value)}>
-              {selectableProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          )}
+          <select style={{ ...styles.input, marginBottom: 6 }} value={projId} onChange={(e) => setProjId(e.target.value)}>
+            {selectableProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
           <div style={{ display: "flex", gap: 4 }}>
             <button style={styles.confirmBtn} onClick={confirmAdd}>追加</button>
             <button style={styles.cancelBtn} onClick={cancelAdd}>キャンセル</button>

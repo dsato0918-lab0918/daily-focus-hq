@@ -176,8 +176,8 @@ export default function DailyFocusHQ() {
   // ── クイック追加（モバイル専用） ──────────────────────────────
   useEffect(() => {
     if (showQuickAdd) {
-      const firstProj = projects[0];
-      setQaProjId(firstProj?.id ?? "");
+      const defaultProj = curProjId ?? projects.find((p) => !p.archived)?.id ?? "";
+      setQaProjId(defaultProj);
       setQaDue("");
       setQaTitle("");
       setTimeout(() => qaInputRef.current?.focus(), 100);
