@@ -115,6 +115,7 @@ textarea {
 @media (max-width: 767px) {
   html, body {
     touch-action: manipulation;
+    font-size: 16px;
   }
 
   .desktop-layout { display: none !important; }
