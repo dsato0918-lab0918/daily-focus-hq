@@ -17,6 +17,11 @@ export function middleware(req: NextRequest) {
   }
 
   if (token !== correctPassword) {
+    // API ルートには JSON 401 を返す（リダイレクトすると fetch が HTML を受け取りパースエラーになる）
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    // ページルートはログインへリダイレクト
     const loginUrl = new URL("/login", req.url);
     return NextResponse.redirect(loginUrl);
   }

@@ -26,7 +26,13 @@ async function api(path: string, method = "GET", body?: unknown) {
     method,
     headers: body ? { "Content-Type": "application/json" } : {},
     body: body ? JSON.stringify(body) : undefined,
+    credentials: "same-origin", // クッキーを確実に送信
   });
+  // 401: 未認証（スマホ等で別ブラウザからログインしていない場合）
+  if (res.status === 401) {
+    window.location.href = "/login";
+    throw new Error("Unauthorized");
+  }
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
 }
@@ -88,8 +94,11 @@ export default function DailyFocusHQ() {
           if (Array.isArray(d) && d.length > 0) setDomains(d);
         }
       })
-      .catch(() => {
-        if (!cancelled) setError("Notionからデータを読み込めませんでした");
+      .catch((e: unknown) => {
+        // Unauthorized の場合は api() 内で /login へリダイレクト済み
+        if (!cancelled && String(e) !== "Error: Unauthorized") {
+          setError("Notionからデータを読み込めませんでした");
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
