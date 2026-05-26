@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
-import { todayDue, formatDueDisplay } from "@/lib/data";
+import { todayDue, tomorrowDue, formatDueDisplay } from "@/lib/data";
 import type { Domain, DomainKey, Project, Task } from "@/lib/types";
 
 interface Props {
@@ -81,7 +81,7 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
   const [showDone, setShowDone] = useState(false);
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState("");
-  const [due, setDue] = useState(todayDue());
+  const [due, setDue] = useState(tomorrowDue());
   const [urgent, setUrgent] = useState(false);
   const [projId, setProjId] = useState<string>("");
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
@@ -116,7 +116,7 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
     if (adding) {
       const defaultProj = curProjId ?? selectableProjects[0]?.id ?? "";
       setProjId(defaultProj);
-      setDue(todayDue());
+      setDue(tomorrowDue());
       setUrgent(false);
       setTitle("");
       inputRef.current?.focus();
@@ -127,7 +127,7 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
     if (title.trim() && projId) {
       onAddTask(title.trim(), projId, due, urgent);
       setTitle("");
-      setDue(todayDue());
+      setDue(tomorrowDue());
       setUrgent(false);
       setAdding(false);
     }

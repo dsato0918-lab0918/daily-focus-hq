@@ -32,6 +32,16 @@ export function todayDue(): string {
   return `${y}-${m}-${day}`;
 }
 
+/** 翌日の日付を "YYYY-MM-DD" 形式で返す */
+export function tomorrowDue(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 /** "YYYY-MM-DD" → "M/D"、旧形式 "MM/DD" はそのまま返す */
 export function formatDueDisplay(due: string): string {
   if (!due) return "";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
-import { initialDomains, DOMAIN_COLOR_PRESETS, DOMAIN_ICONS } from "@/lib/data";
+import { initialDomains, DOMAIN_COLOR_PRESETS, DOMAIN_ICONS, tomorrowDue } from "@/lib/data";
 import type { Domain, DomainKey, Project, Task } from "@/lib/types";
 import DomainPane from "./DomainPane";
 import ProjectPane from "./ProjectPane";
@@ -178,7 +178,7 @@ export default function DailyFocusHQ() {
     if (showQuickAdd) {
       const defaultProj = curProjId ?? projects.find((p) => !p.archived)?.id ?? "";
       setQaProjId(defaultProj);
-      setQaDue("");
+      setQaDue(tomorrowDue());
       setQaTitle("");
       setTimeout(() => qaInputRef.current?.focus(), 100);
     }
