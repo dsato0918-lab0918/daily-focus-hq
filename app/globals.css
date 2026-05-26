@@ -129,6 +129,11 @@ textarea {
     font-size: 16px !important;
   }
 
+  /* 詳細ページの本文テキストを16pxに */
+  .detail-body-text {
+    font-size: 16px !important;
+  }
+
   .desktop-layout { display: none !important; }
 
   .mobile-layout {

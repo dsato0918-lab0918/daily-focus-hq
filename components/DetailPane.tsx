@@ -239,14 +239,14 @@ export default function DetailPane({ task, project, onMemoChange, onUpdateTask, 
         {editingTitle ? (
           <input
             ref={titleRef}
-            style={{ ...styles.memo, height: "auto", resize: "none", marginBottom: 10, padding: "4px 8px", fontSize: 14, fontWeight: 500 }}
+            className="detail-body-text" style={{ ...styles.memo, height: "auto", resize: "none", marginBottom: 10, padding: "4px 8px", fontSize: 14, fontWeight: 500 }}
             value={titleValue}
             onChange={(e) => setTitleValue(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) confirmEditTitle(); if (e.key === "Escape") setEditingTitle(false); }}
             onBlur={confirmEditTitle}
           />
         ) : (
-          <div style={{ ...styles.taskTitle, cursor: "pointer", display: "flex", alignItems: "flex-start", gap: 4 }}
+          <div className="detail-body-text" style={{ ...styles.taskTitle, cursor: "pointer", display: "flex", alignItems: "flex-start", gap: 4 }}
             onClick={startEditTitle} title="クリックで編集">
             {task.title}
             <i className="ti ti-pencil" style={{ fontSize: 11, color: "var(--color-text-tertiary)", marginTop: 2, flexShrink: 0 }} />
@@ -286,14 +286,14 @@ export default function DetailPane({ task, project, onMemoChange, onUpdateTask, 
         <div style={styles.fieldLabel}>期限</div>
         <input
           type="date"
-          style={{ ...styles.memo, height: "auto", resize: "none", marginBottom: 14, padding: "4px 8px", fontSize: 13, width: "100%" }}
+          className="detail-body-text" style={{ ...styles.memo, height: "auto", resize: "none", marginBottom: 14, padding: "4px 8px", fontSize: 13, width: "100%" }}
           value={task.due.includes("-") ? task.due : ""}
           onChange={(e) => onUpdateTask(task.id, { due: e.target.value })}
         />
 
         <div style={styles.fieldLabel}>メモ</div>
         <textarea
-          style={styles.memo}
+          className="detail-body-text" style={styles.memo}
           rows={4}
           placeholder="メモを追加..."
           value={task.memo}
