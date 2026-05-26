@@ -192,12 +192,23 @@ export async function deleteTask(id: string): Promise<void> {
 
 // ── ドメイン変換 ─────────────────────────────────────────────
 
+// 日本語ラベル → 英語キー（プロジェクトの セクション select 値と一致させる）
+const LABEL_TO_KEY: Record<string, string> = {
+  "設計":       "design",
+  "施工":       "const",
+  "経営":       "mgmt",
+  "スタッフ管理": "staff",
+};
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function pageToDomain(page: any): Domain {
   const p = page.properties;
+  const label = getText(p["名前"]);
+  const key   = LABEL_TO_KEY[label] ?? label;
   return {
-    id:        page.id,
-    label:     getText(p["名前"]),
+    id:        key,       // プロジェクト domain と一致する英語キー
+    notionId:  page.id,   // Notion UUID（CRUD API 用）
+    label,
     icon:      getText(p["アイコン"]) || "ti-layout-grid",
     bgColor:   getText(p["背景色"])  || "#E6F1FB",
     textColor: getText(p["文字色"]) || "#185FA5",

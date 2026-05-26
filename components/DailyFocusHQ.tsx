@@ -257,10 +257,14 @@ export default function DailyFocusHQ() {
 
   const handleUpdateDomain = useCallback((id: string, label: string) => {
     setDomains((prev) => prev.map((d) => (d.id === id ? { ...d, label } : d)));
-    api(`/api/notion/domains/${id}`, "PATCH", { label }).catch(console.error);
-  }, []);
+    // notionId（UUID）が存在する場合はそれを API URL に使用する
+    const apiId = domains.find((d) => d.id === id)?.notionId ?? id;
+    api(`/api/notion/domains/${apiId}`, "PATCH", { label }).catch(console.error);
+  }, [domains]);
 
   const handleDeleteDomain = useCallback((id: string) => {
+    // notionId（UUID）が存在する場合はそれを API URL に使用する
+    const apiId = domains.find((d) => d.id === id)?.notionId ?? id;
     const projIds = projects.filter((p) => p.domain === id).map((p) => p.id);
     setTasks((prev) => prev.filter((t) => !projIds.includes(t.projId)));
     setProjects((prev) => prev.filter((p) => p.domain !== id));
@@ -268,8 +272,8 @@ export default function DailyFocusHQ() {
     setCurDomain((cur) => (cur === id ? "all" : cur));
     setCurProjId(null);
     setSelTaskId(null);
-    api(`/api/notion/domains/${id}`, "DELETE").catch(console.error);
-  }, [projects]);
+    api(`/api/notion/domains/${apiId}`, "DELETE").catch(console.error);
+  }, [projects, domains]);
 
   // ── 共通 props ───────────────────────────────────────────────
   const domainProps = {

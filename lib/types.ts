@@ -4,6 +4,7 @@ export type ProjectStatus = "g" | "a" | "r";
 
 export interface Domain {
   id: DomainKey;
+  notionId?: string;   // Notion page UUID（CRUD API 呼び出し用）
   label: string;
   icon: string;
   bgColor: string;
