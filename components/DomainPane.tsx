@@ -52,6 +52,7 @@ export default function DomainPane({ domains, projects, curDomain, onSelect, onA
       <div
         style={{ ...s.row, background: curDomain === "all" ? "var(--color-info-bg)" : "transparent" }}
         onClick={() => onSelect("all")}
+        onTouchEnd={(e) => { e.stopPropagation(); onSelect("all"); }}
         onMouseEnter={() => setHoveredId("all")}
         onMouseLeave={() => setHoveredId(null)}
       >
@@ -74,6 +75,7 @@ export default function DomainPane({ domains, projects, curDomain, onSelect, onA
             key={d.id}
             style={{ ...s.row, background: isActive ? "var(--color-info-bg)" : isHovered ? "var(--color-bg-secondary)" : "transparent" }}
             onClick={() => !isEditing && onSelect(d.id)}
+            onTouchEnd={(e) => { e.stopPropagation(); if (!isEditing) onSelect(d.id); }}
             onMouseEnter={() => setHoveredId(d.id)}
             onMouseLeave={() => setHoveredId(null)}
           >

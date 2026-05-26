@@ -241,6 +241,27 @@ export default function ProjectPane({
     <div style={s.pane}>
       <div style={s.header}>プロジェクト</div>
 
+      {/* ── セクションフィルタ中の表示ラベル ── */}
+      {curDomain !== "all" && (() => {
+        const activeDomain = domains.find((d) => d.id === curDomain);
+        return activeDomain ? (
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8,
+            padding: "6px 12px",
+            background: activeDomain.bgColor,
+            borderBottom: "0.5px solid var(--color-border)",
+            flexShrink: 0,
+          }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: activeDomain.textColor, letterSpacing: "0.04em" }}>
+              {activeDomain.label}
+            </span>
+            <span style={{ fontSize: 10, color: activeDomain.textColor, opacity: 0.7 }}>
+              のプロジェクト
+            </span>
+          </div>
+        ) : null;
+      })()}
+
       {/* ── アクティブなプロジェクト ── */}
       {curDomain === "all"
         ? domains.map((d) => {
