@@ -174,7 +174,7 @@ export default function ProjectPane({
             onBlur={confirmEdit}
           />
         ) : (
-          <span style={{ fontSize: 12.5, flex: 1, color: isActive ? "var(--color-info-text)" : "var(--color-text-primary)", fontWeight: isActive ? 500 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <span className="proj-item-name" style={{ fontSize: 12.5, flex: 1, color: isActive ? "var(--color-info-text)" : "var(--color-text-primary)", fontWeight: isActive ? 500 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {proj.name}
           </span>
         )}

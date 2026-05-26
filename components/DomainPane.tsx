@@ -58,7 +58,7 @@ export default function DomainPane({ domains, projects, curDomain, onSelect, onA
         <span style={{ ...s.icon, background: "var(--color-bg-secondary)", color: "var(--color-text-secondary)" }}>
           <i className="ti ti-layout-grid" aria-hidden="true" />
         </span>
-        <span style={{ ...s.label, color: curDomain === "all" ? "var(--color-info-text)" : "var(--color-text-primary)", fontWeight: curDomain === "all" ? 500 : 400 }}>全体俯瞰</span>
+        <span className="domain-item-label" style={{ ...s.label, color: curDomain === "all" ? "var(--color-info-text)" : "var(--color-text-primary)", fontWeight: curDomain === "all" ? 500 : 400 }}>全体俯瞰</span>
         <span style={{ ...s.badge, background: curDomain === "all" ? "rgba(0,0,0,0.08)" : "var(--color-bg-secondary)", color: curDomain === "all" ? "var(--color-info-text)" : "var(--color-text-tertiary)" }}>{countProjects("all")}</span>
       </div>
 
@@ -95,7 +95,7 @@ export default function DomainPane({ domains, projects, curDomain, onSelect, onA
                 onBlur={confirmEdit}
               />
             ) : (
-              <span style={{ ...s.label, flex: 1, color: isActive ? "var(--color-info-text)" : "var(--color-text-primary)", fontWeight: isActive ? 500 : 400 }}>{d.label}</span>
+              <span className="domain-item-label" style={{ ...s.label, flex: 1, color: isActive ? "var(--color-info-text)" : "var(--color-text-primary)", fontWeight: isActive ? 500 : 400 }}>{d.label}</span>
             )}
 
             {!isEditing && isHovered ? (
