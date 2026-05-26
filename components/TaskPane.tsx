@@ -231,7 +231,7 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
               </div>
             </div>
           ) : (
-            <div style={{ fontSize: 12.5, color: task.done ? "var(--color-text-tertiary)" : "var(--color-text-primary)", textDecoration: task.done ? "line-through" : "none", lineHeight: 1.4 }}>
+            <div className="task-item-title" style={{ fontSize: 12.5, color: task.done ? "var(--color-text-tertiary)" : "var(--color-text-primary)", textDecoration: task.done ? "line-through" : "none", lineHeight: 1.4 }}>
               {task.title}
             </div>
           )}
@@ -373,7 +373,7 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
             {rank.label}
           </div>
           <div style={styles.focusBody}>
-            <span style={{ fontSize: 12.5 }}>{task.title}</span>
+            <span className="task-item-title" style={{ fontSize: 12.5 }}>{task.title}</span>
             <br />
             <span style={{ fontSize: 11, color: "var(--color-text-tertiary)" }}>
               {proj?.name} · {formatDueDisplay(task.due)}{task.urgent ? " · 急ぎ" : ""}
