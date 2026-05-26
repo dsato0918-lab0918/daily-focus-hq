@@ -32,7 +32,13 @@ async function api(path: string, method = "GET", body?: unknown) {
 }
 
 export default function DailyFocusHQ() {
-  const [domains,  setDomains]  = useState<Domain[]>(initialDomains);
+  const [domains,  setDomains]  = useState<Domain[]>(() => {
+    try {
+      const saved = localStorage.getItem("sugar-task-domains");
+      if (saved) return JSON.parse(saved) as Domain[];
+    } catch { /* ignore */ }
+    return initialDomains;
+  });
   const [projects, setProjects] = useState<Project[]>([]);
   const [tasks,    setTasks]    = useState<Task[]>([]);
   const [loading,  setLoading]  = useState(true);
@@ -232,6 +238,11 @@ export default function DailyFocusHQ() {
     setProjects((prev) => prev.map((p) => p.id === id ? { ...p, domain } : p));
     api(`/api/notion/projects/${id}`, "PATCH", { domain }).catch(console.error);
   }, []);
+
+  // domains が変わるたびに localStorage へ保存
+  useEffect(() => {
+    try { localStorage.setItem("sugar-task-domains", JSON.stringify(domains)); } catch { /* ignore */ }
+  }, [domains]);
 
   // ── セクション操作（ローカルのみ） ────────────────────────────
   const handleAddDomain = useCallback((name: string) => {
