@@ -162,6 +162,7 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
     const domColor = domainColorMap[domKey] ?? { bg: "var(--color-bg-secondary)", color: "var(--color-text-secondary)" };
     const isSelected = selTaskId === task.id;
     const isEditing = editingTaskId === task.id;
+    const isOverdue  = !task.done && !!task.due && parseDueDate(task.due) < new Date(new Date().toDateString());
 
     return (
       <div
@@ -169,7 +170,17 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
         onClick={() => !isEditing && onSelectTask(task.id)}
         onMouseEnter={() => setHoveredTaskId(task.id)}
         onMouseLeave={() => setHoveredTaskId(null)}
-        style={{ ...styles.taskRow, background: isSelected ? "var(--color-info-bg)" : hoveredTaskId === task.id ? "var(--color-bg-secondary)" : "transparent" }}
+        style={{
+          ...styles.taskRow,
+          background: isSelected
+            ? "var(--color-info-bg)"
+            : isOverdue
+            ? "var(--color-overdue-bg)"
+            : hoveredTaskId === task.id
+            ? "var(--color-bg-secondary)"
+            : "transparent",
+          borderLeft: isOverdue ? "3px solid var(--color-overdue-border)" : "3px solid transparent",
+        }}
       >
         <button
           onClick={(e) => { e.stopPropagation(); onToggleDone(task.id); }}
@@ -226,7 +237,11 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
           )}
           <div style={{ display: "flex", gap: 4, marginTop: 3, flexWrap: "wrap" }}>
             {task.urgent && !task.done && <span style={{ ...styles.chip, background: "#FCEBEB", color: "#A32D2D", border: "none" }}>急ぎ</span>}
-            {task.due && <span style={styles.chip}>{formatDueDisplay(task.due)}</span>}
+            {task.due && (
+              <span style={{ ...styles.chip, ...(isOverdue ? { background: "var(--color-overdue-bg)", color: "var(--color-overdue-text)", border: "0.5px solid var(--color-overdue-border)" } : {}) }}>
+                {formatDueDisplay(task.due)}
+              </span>
+            )}
             {proj && <span style={{ ...styles.chip, background: domColor.bg, color: domColor.color, border: "none" }}>{proj.name}</span>}
             {task.staffRequested && (
               <span style={{ ...styles.chip, background: "#F4ECF5", color: "#4A154B", border: "0.5px solid #C9A8CB", display: "inline-flex", alignItems: "center", gap: 3 }}>
