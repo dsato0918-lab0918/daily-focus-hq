@@ -70,9 +70,11 @@ export default function ProjectPane({
   const archivedProjects = useMemo(() => projects.filter((p) =>  p.archived), [projects]);
 
   // 表示対象（セクションフィルタ適用）
-  const visibleActive = useMemo(() =>
-    curDomain === "all" ? activeProjects : activeProjects.filter((p) => p.domain === curDomain),
-    [activeProjects, curDomain]);
+  const STATUS_ORDER: Record<string, number> = { r: 0, a: 1, g: 2 };
+  const visibleActive = useMemo(() => {
+    const base = curDomain === "all" ? activeProjects : activeProjects.filter((p) => p.domain === curDomain);
+    return [...base].sort((a, b) => (STATUS_ORDER[a.status] ?? 1) - (STATUS_ORDER[b.status] ?? 1));
+  }, [activeProjects, curDomain]);
 
   const visibleArchived = useMemo(() =>
     curDomain === "all" ? archivedProjects : archivedProjects.filter((p) => p.domain === curDomain),
