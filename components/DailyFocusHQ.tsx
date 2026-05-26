@@ -65,46 +65,104 @@ export default function DailyFocusHQ() {
   // メモ保存デバウンス用
   const memoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ── PTR (Pull-to-Refresh) 用 state & ref ──────────────────────
+  const [ptrState, setPtrState]   = useState<"idle" | "pulling" | "refreshing">("idle");
+  const [ptrY,     setPtrY]       = useState(0);   // 引っ張り量 (px)
+  const ptrStartY  = useRef(0);
+  const ptrActive  = useRef(false);
+  const PTR_THRESHOLD = 64;   // これ以上引いたら更新発動
+  const PTR_MAX       = 80;   // インジケーターの最大移動量
+
   const projMap   = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
   const selTask   = useMemo(() => tasks.find((t) => t.id === selTaskId) ?? null, [tasks, selTaskId]);
   const selProject = useMemo(() => (selTask ? projMap.get(selTask.projId) ?? null : null), [selTask, projMap]);
 
+  // ── データ読み込み（PTR・Visibility API・初期ロード共用）────────
+  const loadData = useCallback(async (silent = false) => {
+    if (!silent) { setLoading(true); setError(null); }
+    try {
+      const { projects: p, tasks: t, domains: d } = await api("/api/notion/data");
+      // localStorageに保存されたプロジェクト順序を適用
+      let sorted = p ?? [];
+      try {
+        const saved = localStorage.getItem("sugar-task-project-order");
+        if (saved) {
+          const order: string[] = JSON.parse(saved);
+          const orderMap = new Map(order.map((id, i) => [id, i]));
+          sorted = sorted.sort((a: Project, b: Project) =>
+            (orderMap.get(a.id) ?? 99999) - (orderMap.get(b.id) ?? 99999)
+          );
+        }
+      } catch { /* ignore */ }
+      setProjects(sorted);
+      setTasks(t ?? []);
+      if (Array.isArray(d) && d.length > 0) setDomains(d);
+    } catch (e: unknown) {
+      // Unauthorized の場合は api() 内で /login へリダイレクト済み
+      if (String(e) !== "Error: Unauthorized" && !silent) {
+        setError("Notionからデータを読み込めませんでした");
+      }
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── 初期データ読み込み ────────────────────────────────────────
   useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    api("/api/notion/data")
-      .then(({ projects: p, tasks: t, domains: d }) => {
-        if (!cancelled) {
-          // localStorageに保存されたプロジェクト順序を適用
-          try {
-            const saved = localStorage.getItem("sugar-task-project-order");
-            if (saved) {
-              const order: string[] = JSON.parse(saved);
-              const orderMap = new Map(order.map((id, i) => [id, i]));
-              p = (p ?? []).sort((a: Project, b: Project) =>
-                (orderMap.get(a.id) ?? 99999) - (orderMap.get(b.id) ?? 99999)
-              );
-            }
-          } catch { /* ignore */ }
-          setProjects(p ?? []);
-          setTasks(t ?? []);
-          // Notion DB からドメインが取得できた場合は上書き
-          if (Array.isArray(d) && d.length > 0) setDomains(d);
+    loadData();
+  }, [loadData]);
+
+  // ── Page Visibility API: バックグラウンド復帰時に再取得 ────────
+  useEffect(() => {
+    let lastHidden = 0;
+    const STALE_MS = 60_000; // 1分以上バックグラウンドなら再取得
+    const handleVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        lastHidden = Date.now();
+      } else if (document.visibilityState === "visible") {
+        if (Date.now() - lastHidden >= STALE_MS) {
+          loadData(true); // silent: ローディング表示なしで静かに更新
         }
-      })
-      .catch((e: unknown) => {
-        // Unauthorized の場合は api() 内で /login へリダイレクト済み
-        if (!cancelled && String(e) !== "Error: Unauthorized") {
-          setError("Notionからデータを読み込めませんでした");
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => { cancelled = true; };
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [loadData]);
+
+  // ── PTR ハンドラー（モバイル専用） ───────────────────────────
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const el = e.currentTarget as HTMLElement;
+    if (el.scrollTop > 0) return;
+    ptrStartY.current = e.touches[0].clientY;
+    ptrActive.current = true;
   }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!ptrActive.current) return;
+    const el = e.currentTarget as HTMLElement;
+    if (el.scrollTop > 0) { ptrActive.current = false; setPtrY(0); setPtrState("idle"); return; }
+    const delta = e.touches[0].clientY - ptrStartY.current;
+    if (delta <= 0) { ptrActive.current = false; setPtrY(0); setPtrState("idle"); return; }
+    // 抵抗感を出すためにsqrtで減衰
+    const clamped = Math.min(Math.sqrt(delta) * 5, PTR_MAX);
+    setPtrY(clamped);
+    setPtrState(delta >= PTR_THRESHOLD ? "pulling" : "pulling");
+  }, []);
+
+  const handleTouchEnd = useCallback(async () => {
+    if (!ptrActive.current) return;
+    ptrActive.current = false;
+    if (ptrY >= PTR_THRESHOLD) {
+      setPtrState("refreshing");
+      setPtrY(40); // リフレッシュ中は固定位置
+      await loadData(true);
+      setPtrState("idle");
+      setPtrY(0);
+    } else {
+      setPtrState("idle");
+      setPtrY(0);
+    }
+  }, [ptrY, loadData]);
 
   // ── 選択系 ────────────────────────────────────────────────────
   const handleSelectDomain = useCallback((domain: DomainKey) => {
@@ -362,7 +420,33 @@ export default function DailyFocusHQ() {
 
       {/* モバイルレイアウト */}
       <div className="mobile-layout">
-        <div className="mobile-content">
+        {/* PTR インジケーター */}
+        <div
+          className="ptr-indicator"
+          style={{
+            transform: `translateY(${ptrY - 48}px)`,
+            opacity: ptrY > 8 ? Math.min(ptrY / PTR_THRESHOLD, 1) : 0,
+          }}
+        >
+          <i
+            className={`ti ${ptrState === "refreshing" ? "ti-refresh ptr-spin" : "ti-arrow-down"}`}
+            style={{
+              fontSize: 18,
+              transform: ptrState !== "refreshing"
+                ? `rotate(${Math.min(ptrY / PTR_THRESHOLD, 1) * 180}deg)`
+                : undefined,
+              transition: ptrState !== "refreshing" ? "none" : undefined,
+            }}
+            aria-hidden="true"
+          />
+        </div>
+        <div
+          className="mobile-content"
+          style={{ transform: ptrState !== "idle" ? `translateY(${ptrY}px)` : undefined, transition: ptrState === "idle" ? "transform 0.2s ease" : "none" }}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
           {activeMobilePane === "nav" && (
             <div className="mobile-nav-pane">
               <div className="mobile-nav-domain">

@@ -349,3 +349,45 @@ textarea {
   }
 }
 
+
+/* ── PTR (Pull-to-Refresh) ─────────────────────────────────── */
+@media (max-width: 767px) {
+  /* ブラウザ標準のPTRを無効化（PWAスタンドアロンでも念のため） */
+  .mobile-layout {
+    overscroll-behavior-y: none;
+  }
+
+  /* コンテンツ領域のPTR変形を滑らかに */
+  .mobile-content {
+    will-change: transform;
+  }
+
+  /* インジケーター本体 */
+  .ptr-indicator {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%) translateY(-48px);
+    z-index: 200;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--color-bg);
+    border: 0.5px solid var(--color-border-mid);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-secondary);
+    pointer-events: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+
+  /* リフレッシュ中のスピンアニメーション */
+  @keyframes ptr-rotate {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+  .ptr-spin {
+    animation: ptr-rotate 0.7s linear infinite;
+  }
+}
