@@ -85,6 +85,7 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
   const [urgent, setUrgent] = useState(false);
   const [projId, setProjId] = useState<string>("");
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [focusCollapsed, setFocusCollapsed] = useState(false);
   const [editingTitle, setEditingTitle] = useState("");
   const [editingDue, setEditingDue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -392,14 +393,24 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
 
       {/* ── 上段: 今日のフォーカス ── */}
       <div style={styles.focusSection}>
-        <div style={styles.sectionHeader}>
+        <div
+          style={{ ...styles.sectionHeader, cursor: "pointer", userSelect: "none" }}
+          onClick={() => setFocusCollapsed((v) => !v)}
+        >
           <i className="ti ti-sparkles" style={{ fontSize: 11, marginRight: 5 }} aria-hidden="true" />
           今日のフォーカス
           <span style={{ marginLeft: 6, fontSize: 10, color: "var(--color-text-tertiary)", fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>AIが優先度を分析</span>
+          <i
+            className={`ti ${focusCollapsed ? "ti-chevron-right" : "ti-chevron-down"} focus-toggle-icon`}
+            style={{ marginLeft: "auto", fontSize: 13, color: "var(--color-text-tertiary)" }}
+            aria-hidden="true"
+          />
         </div>
-        <div style={styles.focusScroll}>
-          {renderFocusCards()}
-        </div>
+        {!focusCollapsed && (
+          <div style={styles.focusScroll}>
+            {renderFocusCards()}
+          </div>
+        )}
       </div>
 
       {/* ── 下段: タスク一覧 ── */}
