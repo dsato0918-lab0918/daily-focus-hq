@@ -16,7 +16,10 @@ export async function GET() {
     const [projects, tasks, domains] = await Promise.all([
       fetchAllProjects(),
       fetchAllTasks(),
-      fetchAllDomains(), // NOTION_DOMAINS_DB_ID 未設定なら [] を返す
+      fetchAllDomains().catch((e) => {
+        console.warn("fetchAllDomains failed (integration may not have access):", e);
+        return [];
+      }),
     ]);
     return NextResponse.json({ projects, tasks, domains });
   } catch (e) {
