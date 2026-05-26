@@ -228,6 +228,11 @@ export default function DailyFocusHQ() {
     });
   }, []);
 
+  const handleMoveDomain = useCallback((id: string, domain: string) => {
+    setProjects((prev) => prev.map((p) => p.id === id ? { ...p, domain } : p));
+    api(`/api/notion/projects/${id}`, "PATCH", { domain }).catch(console.error);
+  }, []);
+
   // ── セクション操作（ローカルのみ） ────────────────────────────
   const handleAddDomain = useCallback((name: string) => {
     setDomains((prev) => {
@@ -268,6 +273,7 @@ export default function DailyFocusHQ() {
     onArchiveProject: handleArchiveProject,
     onRestoreProject: handleRestoreProject,
     onReorderProjects: handleReorderProjects,
+    onMoveDomain: handleMoveDomain,
   };
   const taskProps = {
     tasks, projects, domains, curDomain, curProjId, selTaskId,

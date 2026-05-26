@@ -16,6 +16,7 @@ interface Props {
   onArchiveProject: (id: string) => void;
   onRestoreProject: (id: string) => void;
   onReorderProjects: (fromId: string, toId: string) => void;
+  onMoveDomain: (id: string, domain: DomainKey) => void;
 }
 
 const STATUS_COLORS: Record<Project["status"], string> = {
@@ -28,7 +29,7 @@ const STATUS_LABELS: Record<Project["status"], string> = { g: "順調", a: "注�
 export default function ProjectPane({
   domains, projects, tasks, curDomain, curProjId,
   onSelect, onAddProject, onUpdateProject, onDeleteProject,
-  onArchiveProject, onRestoreProject, onReorderProjects,
+  onArchiveProject, onRestoreProject, onReorderProjects, onMoveDomain,
 }: Props) {
   const [adding, setAdding] = useState(false);
   const [addName, setAddName] = useState("");
@@ -42,6 +43,7 @@ export default function ProjectPane({
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [dragAtEnd, setDragAtEnd] = useState(false);
+  const [dragOverDomainId, setDragOverDomainId] = useState<string | null>(null);
   const lastDragEndMs = useRef(0);
   const addRef = useRef<HTMLInputElement>(null);
   const editRef = useRef<HTMLInputElement>(null);
@@ -116,12 +118,19 @@ export default function ProjectPane({
         }}
         onDrop={(e) => {
           e.preventDefault();
-          if (dragId && dragId !== proj.id) onReorderProjects(dragId, proj.id);
-          setDragId(null); setDragOverId(null); setDragAtEnd(false);
+          if (dragId && dragId !== proj.id) {
+            const dragProj = projects.find((p) => p.id === dragId);
+            if (dragProj && dragProj.domain !== proj.domain) {
+              onMoveDomain(dragId, proj.domain);
+            } else {
+              onReorderProjects(dragId, proj.id);
+            }
+          }
+          setDragId(null); setDragOverId(null); setDragAtEnd(false); setDragOverDomainId(null);
         }}
         onDragEnd={() => {
           lastDragEndMs.current = Date.now();
-          setDragId(null); setDragOverId(null); setDragAtEnd(false);
+          setDragId(null); setDragOverId(null); setDragAtEnd(false); setDragOverDomainId(null);
         }}
         style={{
           ...s.row,
@@ -234,8 +243,38 @@ export default function ProjectPane({
       {curDomain === "all"
         ? domains.map((d) => {
             const filtered = visibleActive.filter((p) => p.domain === d.id);
-            if (!filtered.length) return null;
-            return <div key={d.id}><div style={s.sectionLabel}>{d.label}</div>{filtered.map(renderProject)}</div>;
+            const isDomainDragOver = dragOverDomainId === d.id;
+            return (
+              <div key={d.id}>
+                <div
+                  style={{
+                    ...s.sectionLabel,
+                    ...(isDomainDragOver ? { background: "var(--color-info-bg)", color: "var(--color-info-text)" } : {}),
+                    transition: "background 0.15s, color 0.15s",
+                  }}
+                  onDragOver={(e) => {
+                    if (!dragId) return;
+                    e.preventDefault();
+                    setDragOverDomainId(d.id);
+                    setDragOverId(null);
+                    setDragAtEnd(false);
+                  }}
+                  onDragLeave={() => setDragOverDomainId((prev) => prev === d.id ? null : prev)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (dragId) {
+                      const dragProj = projects.find((p) => p.id === dragId);
+                      if (dragProj && dragProj.domain !== d.id) onMoveDomain(dragId, d.id);
+                    }
+                    setDragId(null); setDragOverId(null); setDragAtEnd(false); setDragOverDomainId(null);
+                  }}
+                >
+                  {d.label}
+                  {isDomainDragOver && <span style={{ marginLeft: 6, fontSize: 10, opacity: 0.7 }}>ここに移動</span>}
+                </div>
+                {filtered.length > 0 && filtered.map(renderProject)}
+              </div>
+            );
           })
         : visibleActive.map(renderProject)}
 
@@ -245,7 +284,18 @@ export default function ProjectPane({
           style={{ height: 10, borderTop: dragAtEnd ? "2px solid var(--color-info-text)" : "2px solid transparent", transition: "border-top 0.1s" }}
           onDragOver={(e) => { e.preventDefault(); setDragAtEnd(true); setDragOverId(null); }}
           onDragLeave={() => setDragAtEnd(false)}
-          onDrop={(e) => { e.preventDefault(); if (dragId) onReorderProjects(dragId, "__END__"); setDragId(null); setDragAtEnd(false); }}
+          onDrop={(e) => {
+            e.preventDefault();
+            if (dragId) {
+              if (dragOverDomainId) {
+                const dragProj = projects.find((p) => p.id === dragId);
+                if (dragProj && dragProj.domain !== dragOverDomainId) onMoveDomain(dragId, dragOverDomainId);
+              } else {
+                onReorderProjects(dragId, "__END__");
+              }
+            }
+            setDragId(null); setDragAtEnd(false); setDragOverDomainId(null);
+          }}
         />
       )}
 
