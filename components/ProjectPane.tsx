@@ -31,9 +31,8 @@ export default function ProjectPane({
   onSelect, onAddProject, onUpdateProject, onDeleteProject,
   onArchiveProject, onRestoreProject, onReorderProjects, onMoveDomain,
 }: Props) {
-  const [adding, setAdding] = useState(false);
+  const [addingDomainId, setAddingDomainId] = useState<string | null>(null);
   const [addName, setAddName] = useState("");
-  const [addDomainId, setAddDomainId] = useState<DomainKey>("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -49,8 +48,8 @@ export default function ProjectPane({
   const editRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (adding) { setAddDomainId(curDomain !== "all" ? curDomain : (domains[0]?.id ?? "")); addRef.current?.focus(); }
-  }, [adding, curDomain, domains]);
+    if (addingDomainId) { addRef.current?.focus(); }
+  }, [addingDomainId]);
   useEffect(() => { if (editingId) editRef.current?.focus(); }, [editingId]);
 
   // ドメインIDからドメインを引くマップ
@@ -86,11 +85,49 @@ export default function ProjectPane({
     setEditingId(null);
   };
   const confirmAdd = () => {
-    if (addName.trim() && addDomainId) { onAddProject(addName.trim(), addDomainId); setAddName(""); setAdding(false); }
+    if (addName.trim() && addingDomainId) {
+      onAddProject(addName.trim(), addingDomainId as DomainKey);
+      setAddName("");
+      setAddingDomainId(null);
+    }
   };
   const handleDelete = (id: string) => {
     if (confirmDeleteId === id) { onDeleteProject(id); setConfirmDeleteId(null); }
     else { setConfirmDeleteId(id); setTimeout(() => setConfirmDeleteId(null), 3000); }
+  };
+
+  // セクション末尾の追加ボタン/フォーム
+  const renderAddArea = (domainId: string) => {
+    const isAdding = addingDomainId === domainId;
+    if (isAdding) {
+      return (
+        <div style={s.addForm}>
+          <input
+            ref={addRef}
+            style={s.input}
+            placeholder="プロジェクト名..."
+            value={addName}
+            onChange={(e) => setAddName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.nativeEvent.isComposing) confirmAdd();
+              if (e.key === "Escape") { setAddingDomainId(null); setAddName(""); }
+            }}
+          />
+          <div style={s.formActions}>
+            <button style={s.confirmBtn} onClick={confirmAdd}>追加</button>
+            <button style={s.cancelBtn} onClick={() => { setAddingDomainId(null); setAddName(""); }}>キャンセル</button>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <button
+        style={s.sectionAddBtn}
+        onClick={() => { setAddingDomainId(domainId); setAddName(""); }}
+      >
+        <i className="ti ti-plus" aria-hidden="true" style={{ fontSize: 11 }} /> 追加
+      </button>
+    );
   };
 
   // アクティブなプロジェクト行
@@ -296,10 +333,15 @@ export default function ProjectPane({
                   {isDomainDragOver && <span style={{ marginLeft: 6, fontSize: 10, opacity: 0.7 }}>ここに移動</span>}
                 </div>
                 {filtered.length > 0 && filtered.map(renderProject)}
+                {renderAddArea(d.id)}
               </div>
             );
           })
-        : visibleActive.map(renderProject)}
+        : <>
+            {visibleActive.map(renderProject)}
+            {renderAddArea(curDomain)}
+          </>
+      }
 
       {/* ── 末尾ドロップゾーン ── */}
       {dragId && (
@@ -322,27 +364,7 @@ export default function ProjectPane({
         />
       )}
 
-      {/* ── 追加フォーム / ボタン ── */}
-      {adding ? (
-        <div style={s.addForm}>
-          <input ref={addRef} style={s.input} placeholder="プロジェクト名..." value={addName}
-            onChange={(e) => setAddName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) confirmAdd(); if (e.key === "Escape") { setAdding(false); setAddName(""); } }} />
-          {curDomain === "all" && (
-            <select style={{ ...s.input, marginBottom: 6 }} value={addDomainId} onChange={(e) => setAddDomainId(e.target.value)}>
-              {domains.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
-            </select>
-          )}
-          <div style={s.formActions}>
-            <button style={s.confirmBtn} onClick={confirmAdd}>追加</button>
-            <button style={s.cancelBtn} onClick={() => { setAdding(false); setAddName(""); }}>キャンセル</button>
-          </div>
-        </div>
-      ) : (
-        <button style={s.addBtn} onClick={() => setAdding(true)}>
-          <i className="ti ti-plus" aria-hidden="true" /> プロジェクトを追加
-        </button>
-      )}
+
 
       {/* ── アーカイブ済みセクション ── */}
       {visibleArchived.length > 0 && (
@@ -385,4 +407,5 @@ const s: Record<string, React.CSSProperties> = {
   archiveToggle: { display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", border: "none", borderBottom: "0.5px solid var(--color-border)", borderTop: "0.5px solid var(--color-border)", width: "100%", textAlign: "left", fontSize: 11, cursor: "pointer", color: "var(--color-text-tertiary)", background: "var(--color-bg-secondary)" },
   domainTag: { fontSize: 10, padding: "1px 6px", borderRadius: 4, fontWeight: 500, flexShrink: 0, whiteSpace: "nowrap" as const },
   badge: { fontSize: 10, borderRadius: 10, padding: "1px 6px", minWidth: 18, textAlign: "center" as const, flexShrink: 0 },
+  sectionAddBtn: { display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", border: "none", borderBottom: "0.5px solid var(--color-border)", width: "100%", textAlign: "left" as const, fontSize: 11, cursor: "pointer", color: "var(--color-text-tertiary)", background: "transparent", fontFamily: "inherit" },
 };
