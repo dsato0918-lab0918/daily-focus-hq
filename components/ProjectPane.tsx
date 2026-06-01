@@ -38,6 +38,15 @@ export default function ProjectPane({
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  const [collapsedDomains, setCollapsedDomains] = useState<Set<string>>(new Set());
+
+  const toggleDomainCollapse = (domainId: string) => {
+    setCollapsedDomains((prev) => {
+      const next = new Set(prev);
+      if (next.has(domainId)) next.delete(domainId); else next.add(domainId);
+      return next;
+    });
+  };
   // ドラッグ&ドロップ
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
@@ -311,7 +320,13 @@ export default function ProjectPane({
                     ...s.sectionLabel,
                     ...(isDomainDragOver ? { background: "var(--color-info-bg)", color: "var(--color-info-text)" } : {}),
                     transition: "background 0.15s, color 0.15s",
+                    cursor: "pointer",
+                    userSelect: "none",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
                   }}
+                  onClick={() => !dragId && toggleDomainCollapse(d.id)}
                   onDragOver={(e) => {
                     if (!dragId) return;
                     e.preventDefault();
@@ -329,11 +344,25 @@ export default function ProjectPane({
                     setDragId(null); setDragOverId(null); setDragAtEnd(false); setDragOverDomainId(null);
                   }}
                 >
-                  {d.label}
-                  {isDomainDragOver && <span style={{ marginLeft: 6, fontSize: 10, opacity: 0.7 }}>ここに移動</span>}
+                  <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <i
+                      className={`ti ${collapsedDomains.has(d.id) ? "ti-chevron-right" : "ti-chevron-down"}`}
+                      style={{ fontSize: 10, opacity: 0.6 }}
+                      aria-hidden="true"
+                    />
+                    {d.label}
+                    {isDomainDragOver && <span style={{ fontSize: 10, opacity: 0.7 }}>ここに移動</span>}
+                  </span>
+                  <span style={{ fontSize: 10, color: "var(--color-text-tertiary)", opacity: 0.8 }}>
+                    {filtered.length > 0 ? filtered.length : ""}
+                  </span>
                 </div>
-                {filtered.length > 0 && filtered.map(renderProject)}
-                {renderAddArea(d.id)}
+                {!collapsedDomains.has(d.id) && (
+                  <>
+                    {filtered.length > 0 && filtered.map(renderProject)}
+                    {renderAddArea(d.id)}
+                  </>
+                )}
               </div>
             );
           })
