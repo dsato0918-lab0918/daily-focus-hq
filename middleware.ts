@@ -3,8 +3,12 @@ import { NextRequest, NextResponse } from "next/server";
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // ログインページとAPIルートは認証不要
-  if (pathname.startsWith("/login") || pathname.startsWith("/api/auth")) {
+  // 認証不要のルート
+  if (
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api/webhooks/")   // LINE 等の外部 Webhook
+  ) {
     return NextResponse.next();
   }
 
