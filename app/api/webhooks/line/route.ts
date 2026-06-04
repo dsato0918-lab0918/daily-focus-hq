@@ -36,7 +36,7 @@ async function replyMessage(replyToken: string, text: string) {
 async function parseWithGroq(
   text: string,
   today: string
-): Promise<{ title: string; due_date: string | null; urgent: boolean }> {
+): Promise<{ title: string; due_date: string | null; urgent: boolean; memo: string }> {
   try {
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
@@ -51,10 +51,11 @@ async function parseWithGroq(
             role: "system",
             content: `あなたはタスク抽出AIです。今日の日付は ${today} です。
 ユーザーのメッセージからタスク情報を抽出し、必ず以下のJSON形式のみで返してください（他のテキストは一切含めない）:
-{"title":"タスク名","due_date":"YYYY-MM-DD or null","urgent":false}
+{"title":"タスク名","due_date":"YYYY-MM-DD or null","urgent":false,"memo":""}
 - title: タスク名（日本語）
 - due_date: 日付が含まれていれば YYYY-MM-DD 形式。「明日」「来週」等も変換。なければ null
-- urgent: 急ぎ/至急/ASAP/今すぐ 等が含まれていれば true`,
+- urgent: 急ぎ/至急/ASAP/今すぐ 等が含まれていれば true
+- memo: 備考・補足情報があれば記載。タスク名・期日・急ぎ以外の補足情報（例：「佐藤さんに確認してから」「図面参照」など）。なければ空文字`,
           },
           { role: "user", content: text },
         ],
@@ -67,7 +68,7 @@ async function parseWithGroq(
     const cleaned = content.replace(/```json|```/g, "").trim();
     return JSON.parse(cleaned);
   } catch {
-    return { title: text, due_date: null, urgent: false };
+    return { title: text, due_date: null, urgent: false, memo: "" };
   }
 }
 
@@ -100,14 +101,15 @@ async function createNotionTask(
   title: string,
   projId: string,
   due: string | null,
-  urgent: boolean
+  urgent: boolean,
+  memo: string
 ) {
   const properties: Record<string, unknown> = {
     "タイトル":    { title: [{ text: { content: title } }] },
     "プロジェクト": { relation: [{ id: projId }] },
     "完了":        { checkbox: false },
     "急ぎ":        { checkbox: urgent },
-    "メモ":        { rich_text: [{ text: { content: "" } }] },
+    "メモ":        { rich_text: [{ text: { content: memo } }] },
   };
   // 期日は rich_text 型（date型ではない）
   if (due) properties["期日"] = { rich_text: [{ text: { content: due } }] };
@@ -181,17 +183,18 @@ export async function POST(req: NextRequest) {
       }
 
       // Notion にタスク作成
-      await createNotionTask(parsed.title.trim(), target.id, parsed.due_date, parsed.urgent ?? false);
+      await createNotionTask(parsed.title.trim(), target.id, parsed.due_date, parsed.urgent ?? false, parsed.memo ?? "");
 
       // 返信メッセージ
       const dueStr    = parsed.due_date
         ? `\n📅 期限: ${parsed.due_date.replace(/(\d{4})-(\d{2})-(\d{2})/, "$2/$3")}`
         : "";
       const urgentStr = parsed.urgent ? "\n🔴 急ぎ" : "";
+      const memoStr   = parsed.memo ? `\n📝 備考: ${parsed.memo}` : "";
 
       await replyMessage(
         replyToken,
-        `✅ タスクを追加しました！\n\n📌 ${parsed.title.trim()}${dueStr}${urgentStr}\n📁 ${target.name}`
+        `✅ タスクを追加しました！\n\n📌 ${parsed.title.trim()}${dueStr}${urgentStr}${memoStr}\n📁 ${target.name}`
       );
     } catch (err) {
       console.error("LINE webhook error:", err);
