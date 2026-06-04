@@ -418,7 +418,9 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
 
   // ── 今日のミッションセクション ────────────────────────────────
   const renderMissionSection = () => {
-    const allUndone = tasks.filter((t) => !t.done && !projMap.get(t.projId)?.archived);
+    const allUndone = tasks
+      .filter((t) => !t.done && !projMap.get(t.projId)?.archived)
+      .sort((a, b) => parseDueDate(a.due).getTime() - parseDueDate(b.due).getTime());
 
     // 選択モード
     if (missionSelecting) {
