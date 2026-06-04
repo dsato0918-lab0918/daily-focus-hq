@@ -5,8 +5,8 @@ const LINE_CHANNEL_SECRET       = process.env.LINE_CHANNEL_SECRET ?? "";
 const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN ?? "";
 const NOTION_TOKEN  = process.env.NOTION_TOKEN ?? "";
 const GROQ_API_KEY  = process.env.GROQ_API_KEY ?? "";
-const TASKS_DB_ID    = "578bac9d879142dd95a9629d9cbf7deb";
-const PROJECTS_DB_ID = "178509ee0e144c0982dfbf1c74f60c3b";
+const TASKS_DB_ID    = process.env.NOTION_TASKS_DB_ID    ?? "578bac9d879142dd95a9629d9cbf7deb";
+const PROJECTS_DB_ID = process.env.NOTION_PROJECTS_DB_ID ?? "178509ee0e144c0982dfbf1c74f60c3b";
 
 // ── LINE 署名検証 ───────────────────────────────────────────────
 function verifySignature(body: string, signature: string): boolean {
@@ -103,12 +103,14 @@ async function createNotionTask(
   urgent: boolean
 ) {
   const properties: Record<string, unknown> = {
-    "名前":        { title: [{ text: { content: title } }] },
+    "タイトル":    { title: [{ text: { content: title } }] },
     "プロジェクト": { relation: [{ id: projId }] },
     "完了":        { checkbox: false },
     "急ぎ":        { checkbox: urgent },
+    "メモ":        { rich_text: [{ text: { content: "" } }] },
   };
-  if (due) properties["期限"] = { date: { start: due } };
+  // 期日は rich_text 型（date型ではない）
+  if (due) properties["期日"] = { rich_text: [{ text: { content: due } }] };
 
   await fetch("https://api.notion.com/v1/pages", {
     method: "POST",
