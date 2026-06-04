@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { todayDue, tomorrowDue, formatDueDisplay } from "@/lib/data";
 import type { Domain, DomainKey, Project, Task } from "@/lib/types";
 
@@ -26,31 +26,9 @@ function parseDueDate(due: string): Date {
   return new Date(new Date().getFullYear(), (m || 12) - 1, d || 31);
 }
 
-function scoredFocus(tasks: Task[]): Task[] {
-  const today = new Date();
-  return [...tasks]
-    .filter((t) => !t.done)
-    .map((t) => {
-      let score = 0;
-      if (t.urgent) score += 40;
-      const due = parseDueDate(t.due);
-      const diff = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-      if (diff <= 0) score += 50;
-      else if (diff === 1) score += 30;
-      else if (diff <= 3) score += 15;
-      else if (diff <= 7) score += 5;
-      return { task: t, score };
-    })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 3)
-    .map((x) => x.task);
+function todayStr(): string {
+  return new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" });
 }
-
-const RANK_STYLES = [
-  { bg: "var(--color-const-bg)", color: "var(--color-const-text)", label: "#1 最優先" },
-  { bg: "var(--color-info-bg)",  color: "var(--color-info-text)",  label: "#2" },
-  { bg: "var(--color-mgmt-bg)",  color: "var(--color-mgmt-text)", label: "#3" },
-];
 
 type SortKey = "default" | "due" | "urgent";
 
@@ -85,7 +63,18 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
   const [urgent, setUrgent] = useState(false);
   const [projId, setProjId] = useState<string>("");
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
-  const [focusCollapsed, setFocusCollapsed] = useState(false);
+  // ── 今日のミッション ──────────────────────────────────────────
+  const [missionIds, setMissionIds] = useState<string[]>(() => {
+    try {
+      const s = localStorage.getItem("sugar-task-mission");
+      if (s) { const { date, ids } = JSON.parse(s); if (date === todayStr()) return ids as string[]; }
+    } catch { /* ignore */ }
+    return [];
+  });
+  const [missionSelecting, setMissionSelecting] = useState(false);
+  const [missionDraft, setMissionDraft] = useState<string[]>([]);
+  const [showCelebration, setShowCelebration] = useState(false);
+  const prevMissionDone = useRef(0);
   const [editingTitle, setEditingTitle] = useState("");
   const [editingDue, setEditingDue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -105,6 +94,37 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
   const cancelEdit = () => setEditingTaskId(null);
 
   const projMap = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
+
+  // ミッション達成数
+  const missionDoneCount = useMemo(
+    () => missionIds.filter((id) => tasks.find((t) => t.id === id)?.done).length,
+    [missionIds, tasks]
+  );
+
+  // ミッション全完了で紙吹雪
+  useEffect(() => {
+    if (missionIds.length === 3 && missionDoneCount === 3 && prevMissionDone.current < 3) {
+      setShowCelebration(true);
+      setTimeout(() => setShowCelebration(false), 4500);
+    }
+    prevMissionDone.current = missionDoneCount;
+  }, [missionDoneCount, missionIds.length]);
+
+  // ミッション保存
+  const saveMission = useCallback((ids: string[]) => {
+    setMissionIds(ids);
+    try { localStorage.setItem("sugar-task-mission", JSON.stringify({ date: todayStr(), ids })); } catch { /* ignore */ }
+  }, []);
+
+  // 「これ忘れてない？」候補タスク（期限超過・未完了・ミッション外）
+  const forgottenTask = useMemo(() => {
+    const today = new Date(new Date().toDateString());
+    return tasks
+      .filter((t) => !t.done && !missionIds.includes(t.id) && !projMap.get(t.projId)?.archived && t.due)
+      .map((t) => ({ t, overdue: Math.ceil((today.getTime() - parseDueDate(t.due).getTime()) / 86400000) }))
+      .filter((x) => x.overdue > 0)
+      .sort((a, b) => b.overdue - a.overdue)[0]?.t ?? null;
+  }, [tasks, missionIds, projMap]);
 
   // タスク追加フォームで選択できるプロジェクト（常に全アクティブPJ）
   const selectableProjects = useMemo(
@@ -362,30 +382,170 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
     return rows;
   };
 
-  const renderFocusCards = () => {
-    // 今日のフォーカスは常に未完了タスクのみを対象とする（showDone の状態に依存しない）
-    const undoneTasks = visibleTasks.filter((t) => !t.done);
-    const top3 = scoredFocus(undoneTasks);
-    if (!top3.length) return <div style={styles.empty}>対象タスクがありません</div>;
-    return top3.map((task, i) => {
-      const proj = projMap.get(task.projId);
-      const rank = RANK_STYLES[i];
-      return (
-        <div key={task.id} onClick={() => onSelectTask(task.id)} style={styles.focusCard}>
-          <div style={{ ...styles.focusHeader, background: rank.bg, color: rank.color }}>
-            <i className="ti ti-flame" aria-hidden="true" />
-            {rank.label}
+  // ── 紙吹雪コンポーネント ──────────────────────────────────────
+  const Confetti = () => {
+    const COLORS = ["#185FA5","#378ADD","#FFD700","#FF6B6B","#51CF66","#FF8C00","#9B59B6","#E91E63"];
+    const pieces = useRef(Array.from({ length: 90 }, (_, i) => ({
+      id: i, color: COLORS[i % COLORS.length],
+      left: Math.random() * 100, delay: Math.random() * 1.8,
+      duration: 2.5 + Math.random() * 2,
+      size: 7 + Math.random() * 9,
+      isCircle: Math.random() > 0.5,
+      rotateEnd: 360 + Math.random() * 720,
+    }))).current;
+    return (
+      <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 9999, overflow: "hidden" }}>
+        {pieces.map((p) => (
+          <div key={p.id} style={{
+            position: "absolute", left: `${p.left}%`, top: "-20px",
+            width: p.size, height: p.size, background: p.color,
+            borderRadius: p.isCircle ? "50%" : "2px",
+            animation: `confettiFall ${p.duration}s ${p.delay}s ease-in forwards`,
+          }} />
+        ))}
+        <div style={{ position: "absolute", top: "32%", left: "50%", transform: "translateX(-50%)", textAlign: "center", animation: "celebrationPop 0.5s ease-out forwards" }}>
+          <div style={{ fontSize: 58 }}>🎉</div>
+          <div style={{ marginTop: 10, fontSize: 20, fontWeight: 700, color: "#185FA5", background: "white", padding: "10px 28px", borderRadius: 16, boxShadow: "0 4px 24px rgba(0,0,0,0.18)", whiteSpace: "nowrap" }}>
+            今日のミッション完了！
           </div>
-          <div style={styles.focusBody}>
-            <span className="task-item-title" style={{ fontSize: 12.5 }}>{task.title}</span>
-            <br />
-            <span style={{ fontSize: 11, color: "var(--color-text-tertiary)" }}>
-              {proj?.name} · {formatDueDisplay(task.due)}{task.urgent ? " · 急ぎ" : ""}
+          <div style={{ marginTop: 8, fontSize: 13, color: "#64748B", background: "white", padding: "4px 16px", borderRadius: 8 }}>
+            お疲れさまでした ✨
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ── 今日のミッションセクション ────────────────────────────────
+  const renderMissionSection = () => {
+    const allUndone = tasks.filter((t) => !t.done && !projMap.get(t.projId)?.archived);
+
+    // 選択モード
+    if (missionSelecting) {
+      return (
+        <div style={styles.missionSelectPanel}>
+          <div style={styles.missionSelectTitle}>
+            <i className="ti ti-target" style={{ fontSize: 13 }} aria-hidden="true" />
+            今日やる3つを選んでください
+            <span style={{ marginLeft: "auto", fontSize: 10, color: "var(--color-text-tertiary)" }}>
+              {missionDraft.length} / 3
             </span>
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+            {allUndone.length === 0 && <div style={styles.empty}>未完了タスクがありません</div>}
+            {allUndone.map((task) => {
+              const proj = projMap.get(task.projId);
+              const isChecked = missionDraft.includes(task.id);
+              return (
+                <div key={task.id}
+                  onClick={() => {
+                    if (isChecked) setMissionDraft((p) => p.filter((id) => id !== task.id));
+                    else if (missionDraft.length < 3) setMissionDraft((p) => [...p, task.id]);
+                  }}
+                  style={{ ...styles.missionSelectRow, background: isChecked ? "var(--color-info-bg)" : "transparent", cursor: missionDraft.length >= 3 && !isChecked ? "not-allowed" : "pointer", opacity: missionDraft.length >= 3 && !isChecked ? 0.4 : 1 }}
+                >
+                  <div style={{ ...styles.missionCheckbox, borderColor: isChecked ? "var(--color-info-text)" : "var(--color-border-mid)", background: isChecked ? "var(--color-info-text)" : "transparent" }}>
+                    {isChecked && <i className="ti ti-check" style={{ fontSize: 9, color: "white" }} />}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="task-item-title" style={{ fontSize: 12, color: "var(--color-text-primary)" }}>{task.title}</div>
+                    <div style={{ fontSize: 10, color: "var(--color-text-tertiary)", marginTop: 2 }}>
+                      {proj?.name}{task.due ? ` · ${formatDueDisplay(task.due)}` : ""}{task.urgent ? " · 急ぎ" : ""}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ display: "flex", gap: 6, padding: "8px 10px", borderTop: "0.5px solid var(--color-border)", flexShrink: 0 }}>
+            <button style={styles.missionConfirmBtn}
+              disabled={missionDraft.length === 0}
+              onClick={() => { saveMission(missionDraft); setMissionSelecting(false); }}
+            >
+              {missionDraft.length > 0 ? `${missionDraft.length}つで今日スタート！` : "タスクを選んでください"}
+            </button>
+            <button style={styles.missionCancelBtn} onClick={() => { setMissionSelecting(false); setMissionDraft([]); }}>キャンセル</button>
           </div>
         </div>
       );
-    });
+    }
+
+    // 未設定
+    if (missionIds.length === 0) {
+      return (
+        <div style={styles.missionEmpty}>
+          <i className="ti ti-target" style={{ fontSize: 22, color: "var(--color-text-tertiary)", marginBottom: 6 }} aria-hidden="true" />
+          <div style={{ fontSize: 11, color: "var(--color-text-secondary)", marginBottom: 10 }}>今日やる3つを決めましょう</div>
+          <button style={styles.missionStartBtn} onClick={() => { setMissionDraft([]); setMissionSelecting(true); }}>
+            <i className="ti ti-plus" aria-hidden="true" /> 今日を設定する
+          </button>
+        </div>
+      );
+    }
+
+    // 設定済み
+    const allDone = missionDoneCount === missionIds.length;
+    return (
+      <div style={{ padding: "8px 10px 10px" }}>
+        {/* 進捗バー */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <div style={{ flex: 1, height: 6, background: "var(--color-bg-secondary)", borderRadius: 3, overflow: "hidden" }}>
+            <div style={{ height: "100%", borderRadius: 3, background: allDone ? "var(--color-dot-green)" : "var(--color-info-text)", width: `${(missionDoneCount / missionIds.length) * 100}%`, transition: "width 0.4s ease" }} />
+          </div>
+          <span style={{ fontSize: 11, fontWeight: 500, color: allDone ? "var(--color-dot-green)" : "var(--color-text-secondary)", flexShrink: 0 }}>
+            {missionDoneCount} / {missionIds.length}
+          </span>
+        </div>
+        {/* ミッションタスク一覧 */}
+        {missionIds.map((id, i) => {
+          const task = tasks.find((t) => t.id === id);
+          if (!task) return null;
+          const proj = projMap.get(task.projId);
+          return (
+            <div key={id} onClick={() => onSelectTask(id)}
+              style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 4px", cursor: "pointer", borderRadius: 6, marginBottom: 2 }}
+            >
+              <button onClick={(e) => { e.stopPropagation(); onToggleDone(id); }}
+                style={{ ...styles.checkbox, background: task.done ? "var(--color-success-bg)" : "transparent", borderColor: task.done ? "var(--color-success-text)" : "var(--color-border-mid)", flexShrink: 0 }}
+              >
+                {task.done && <i className="ti ti-check" style={{ fontSize: 10, color: "var(--color-success-text)" }} />}
+              </button>
+              <span style={{ fontSize: 10, fontWeight: 600, color: "var(--color-text-tertiary)", flexShrink: 0 }}>{i + 1}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="task-item-title" style={{ fontSize: 12, color: task.done ? "var(--color-text-tertiary)" : "var(--color-text-primary)", textDecoration: task.done ? "line-through" : "none" }}>{task.title}</div>
+                {proj && <div style={{ fontSize: 10, color: "var(--color-text-tertiary)" }}>{proj.name}{task.due ? ` · ${formatDueDisplay(task.due)}` : ""}</div>}
+              </div>
+            </div>
+          );
+        })}
+        <button style={{ ...styles.missionCancelBtn, marginTop: 6, width: "100%", justifyContent: "center" }}
+          onClick={() => { setMissionDraft(missionIds); setMissionSelecting(true); }}
+        >
+          <i className="ti ti-edit" style={{ fontSize: 11 }} /> 変更する
+        </button>
+      </div>
+    );
+  };
+
+  // ── 「これ忘れてない？」セクション ────────────────────────────
+  const renderForgotSection = () => {
+    if (!forgottenTask) return null;
+    const proj = projMap.get(forgottenTask.projId);
+    const today = new Date(new Date().toDateString());
+    const overdueDays = Math.ceil((today.getTime() - parseDueDate(forgottenTask.due).getTime()) / 86400000);
+    return (
+      <div style={styles.forgotSection}>
+        <div style={styles.forgotHeader}>
+          <i className="ti ti-alert-circle" style={{ fontSize: 10, color: "#BA7517" }} aria-hidden="true" />
+          これ忘れてない？
+        </div>
+        <div onClick={() => onSelectTask(forgottenTask.id)} style={styles.forgotCard}>
+          <span className="task-item-title" style={{ fontSize: 11, flex: 1, color: "var(--color-text-primary)" }}>{forgottenTask.title}</span>
+          <span style={{ fontSize: 10, color: "#BA7517", flexShrink: 0, fontWeight: 500 }}>{overdueDays}日超過</span>
+        </div>
+        {proj && <div style={{ fontSize: 10, color: "var(--color-text-tertiary)", padding: "0 10px 6px" }}>{proj.name}</div>}
+      </div>
+    );
   };
 
   return (
@@ -394,26 +554,22 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
       {/* ── ペインヘッダー ── */}
       <div style={styles.paneHeader}>タスク管理</div>
 
-      {/* ── 上段: 今日のフォーカス ── */}
-      <div style={styles.focusSection}>
-        <div
-          style={{ ...styles.sectionHeader, cursor: "pointer", userSelect: "none" }}
-          onClick={() => setFocusCollapsed((v) => !v)}
-        >
-          <i className="ti ti-sparkles" style={{ fontSize: 11, marginRight: 5 }} aria-hidden="true" />
-          今日のフォーカス
-          <span style={{ marginLeft: 6, fontSize: 10, color: "var(--color-text-tertiary)", fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>AIが優先度を分析</span>
-          <i
-            className={`ti ${focusCollapsed ? "ti-chevron-right" : "ti-chevron-down"} focus-toggle-icon`}
-            style={{ marginLeft: "auto", fontSize: 13, color: "var(--color-text-tertiary)" }}
-            aria-hidden="true"
-          />
+      {/* ── 紙吹雪 ── */}
+      {showCelebration && <Confetti />}
+
+      {/* ── 上段: 今日のミッション ── */}
+      <div style={{ ...styles.focusSection, maxHeight: missionSelecting ? "340px" : undefined }}>
+        <div style={styles.sectionHeader}>
+          <i className="ti ti-target" style={{ fontSize: 11, marginRight: 5 }} aria-hidden="true" />
+          今日のミッション
+          {missionIds.length > 0 && !missionSelecting && (
+            <span style={{ marginLeft: 6, fontSize: 10, color: "var(--color-text-tertiary)", fontWeight: 400, textTransform: "none" as const, letterSpacing: 0 }}>
+              {missionDoneCount === missionIds.length ? "✅ 完了！" : `${missionDoneCount}/${missionIds.length} 完了`}
+            </span>
+          )}
         </div>
-        {!focusCollapsed && (
-          <div style={styles.focusScroll}>
-            {renderFocusCards()}
-          </div>
-        )}
+        {renderMissionSection()}
+        {renderForgotSection()}
       </div>
 
       {/* ── 下段: タスク一覧 ── */}
@@ -482,7 +638,17 @@ const styles: Record<string, React.CSSProperties> = {
   input: { width: "100%", padding: "5px 8px", fontSize: 12, border: "0.5px solid var(--color-border-mid)", borderRadius: 6, background: "var(--color-bg)", color: "var(--color-text-primary)", outline: "none", marginBottom: 6, fontFamily: "inherit" },
   confirmBtn: { flex: 1, padding: "4px 8px", fontSize: 11, fontWeight: 500, border: "0.5px solid var(--color-border-mid)", borderRadius: 5, background: "var(--color-info-bg)", color: "var(--color-info-text)", cursor: "pointer" },
   cancelBtn: { flex: 1, padding: "4px 8px", fontSize: 11, border: "0.5px solid var(--color-border)", borderRadius: 5, background: "transparent", color: "var(--color-text-secondary)", cursor: "pointer" },
-  focusCard: { flex: "1 1 0", minWidth: 0, borderRadius: 8, border: "0.5px solid var(--color-border)", overflow: "hidden", cursor: "pointer" },
-  focusHeader: { padding: "7px 12px", fontSize: 11, fontWeight: 500, display: "flex", alignItems: "center", gap: 6 },
-  focusBody: { padding: "7px 12px", borderTop: "0.5px solid var(--color-border)", background: "var(--color-bg)" },
+  // ミッション
+  missionEmpty: { display: "flex", flexDirection: "column" as const, alignItems: "center", justifyContent: "center", padding: "18px 12px" },
+  missionStartBtn: { display: "flex", alignItems: "center", gap: 6, padding: "8px 18px", border: "1px solid var(--color-info-text)", borderRadius: 20, background: "var(--color-info-bg)", color: "var(--color-info-text)", fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" },
+  missionSelectPanel: { display: "flex", flexDirection: "column" as const, maxHeight: 300, overflow: "hidden" },
+  missionSelectTitle: { display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", fontSize: 11, fontWeight: 500, color: "var(--color-text-secondary)", borderBottom: "0.5px solid var(--color-border)", background: "var(--color-bg-secondary)", flexShrink: 0 },
+  missionSelectRow: { display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderBottom: "0.5px solid var(--color-border)", transition: "background 0.1s" },
+  missionCheckbox: { width: 16, height: 16, borderRadius: 4, border: "1.5px solid", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" },
+  missionConfirmBtn: { flex: 2, padding: "8px 0", border: "none", borderRadius: 8, background: "var(--color-info-text)", color: "white", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" },
+  missionCancelBtn: { flex: 1, padding: "6px 0", border: "0.5px solid var(--color-border)", borderRadius: 8, background: "transparent", color: "var(--color-text-secondary)", fontSize: 11, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 4, justifyContent: "center" },
+  // 忘れてない？
+  forgotSection: { borderTop: "0.5px solid var(--color-border)", background: "var(--color-bg)" },
+  forgotHeader: { display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", fontSize: 9, fontWeight: 500, color: "#BA7517", letterSpacing: "0.04em", textTransform: "uppercase" as const },
+  forgotCard: { display: "flex", alignItems: "center", gap: 8, padding: "5px 10px", cursor: "pointer" },
 };

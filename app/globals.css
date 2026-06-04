@@ -391,3 +391,14 @@ textarea {
     animation: ptr-rotate 0.7s linear infinite;
   }
 }
+
+/* ── 今日のミッション: 紙吹雪アニメーション ─────────────────── */
+@keyframes confettiFall {
+  0%   { transform: translateY(0) rotate(0deg);    opacity: 1; }
+  100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+}
+@keyframes celebrationPop {
+  0%   { transform: translateX(-50%) scale(0.4); opacity: 0; }
+  60%  { transform: translateX(-50%) scale(1.08); opacity: 1; }
+  100% { transform: translateX(-50%) scale(1);    opacity: 1; }
+}
