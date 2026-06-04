@@ -171,10 +171,13 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      // メッセージにプロジェクト名が含まれていれば優先、なければ先頭のプロジェクト
-      let target = projects[0];
-      for (const proj of projects) {
-        if (proj.name && text.includes(proj.name)) { target = proj; break; }
+      // 「シングルタスク」を常にデフォルト。メッセージに他PJ名があれば優先
+      const singleTask = projects.find((p) => p.name === "シングルタスク");
+      let target = singleTask ?? projects[0];
+      if (!singleTask) {
+        for (const proj of projects) {
+          if (proj.name && text.includes(proj.name)) { target = proj; break; }
+        }
       }
 
       // Notion にタスク作成
