@@ -126,22 +126,37 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
     }).catch(console.error);
   }, []);
 
-  // 起動時にNotionからミッションを同期
-  useEffect(() => {
+  // Notionからミッションを同期する関数
+  const syncMissionFromNotion = useCallback(() => {
     const today = todayStr();
     setMissionSyncing(true);
     fetch(`/api/notion/mission?date=${today}`, { credentials: "same-origin" })
       .then((r) => r.json())
       .then(({ taskIds }: { taskIds: string[] }) => {
         if (taskIds.length > 0) {
-          // Notionのデータで上書き（他デバイスで設定した可能性があるため）
           setMissionIds(taskIds);
           try { localStorage.setItem("sugar-task-mission", JSON.stringify({ date: today, ids: taskIds })); } catch { /* ignore */ }
         }
       })
       .catch(console.error)
       .finally(() => setMissionSyncing(false));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 起動時 + バックグラウンド復帰時にNotion同期（Page Visibility API）
+  useEffect(() => {
+    syncMissionFromNotion(); // 初回
+    let lastHidden = 0;
+    const STALE_MS = 30_000; // 30秒以上バックグラウンドなら再同期
+    const handleVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        lastHidden = Date.now();
+      } else if (document.visibilityState === "visible") {
+        if (Date.now() - lastHidden >= STALE_MS) syncMissionFromNotion();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [syncMissionFromNotion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 「これ忘れてない？」候補タスク（期限超過・未完了・ミッション外）
   const forgottenTask = useMemo(() => {
