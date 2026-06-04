@@ -171,8 +171,8 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      // 「シングルタスク」を常にデフォルト。メッセージに他PJ名があれば優先
-      const singleTask = projects.find((p) => p.name === "シングルタスク");
+      // 「自動追加タスク」を常にデフォルト。メッセージに他PJ名があれば優先
+      const singleTask = projects.find((p) => p.name === "自動追加タスク");
       let target = singleTask ?? projects[0];
       if (!singleTask) {
         for (const proj of projects) {
