@@ -256,8 +256,11 @@ export default function DailyFocusHQ() {
     try {
       const created: Project = await api("/api/notion/projects", "POST", { name, domain, status: "g", archived: false });
       setProjects((prev) => prev.map((p) => (p.id === tempId ? created : p)));
+      // 仮IDのまま選択されていた場合、実IDに切り替える
+      setCurProjId((prev) => prev === tempId ? created.id : prev);
     } catch {
       setProjects((prev) => prev.filter((p) => p.id !== tempId));
+      setCurProjId((prev) => prev === tempId ? null : prev);
     }
   }, []);
 

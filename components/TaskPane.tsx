@@ -345,10 +345,16 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
         </div>
       );
     } else {
+      const isProjectPending = projId.startsWith("temp_") || (curProjId?.startsWith("temp_") ?? false);
       rows.push(
-        <button key="add-btn" style={styles.addBtn} onClick={() => setAdding(true)}>
-          <i className="ti ti-plus" aria-hidden="true" />
-          タスクを追加
+        <button
+          key="add-btn"
+          style={{ ...styles.addBtn, opacity: isProjectPending ? 0.5 : 1, cursor: isProjectPending ? "not-allowed" : "pointer" }}
+          onClick={() => !isProjectPending && setAdding(true)}
+          title={isProjectPending ? "プロジェクト作成中..." : ""}
+        >
+          <i className={`ti ${isProjectPending ? "ti-loader-2" : "ti-plus"}`} aria-hidden="true" />
+          {isProjectPending ? "プロジェクト作成中..." : "タスクを追加"}
         </button>
       );
     }
