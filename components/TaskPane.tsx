@@ -65,6 +65,7 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   // ── 今日のミッション ──────────────────────────────────────────
   const [missionIds, setMissionIds] = useState<string[]>(() => {
+    // localStorageをキャッシュとして即時表示、後でNotionから同期
     try {
       const s = localStorage.getItem("sugar-task-mission");
       if (s) { const { date, ids } = JSON.parse(s); if (date === todayStr()) return ids as string[]; }
@@ -74,6 +75,7 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
   const [missionSelecting, setMissionSelecting] = useState(false);
   const [missionDraft, setMissionDraft] = useState<string[]>([]);
   const [showCelebration, setShowCelebration] = useState(false);
+  const [missionSyncing, setMissionSyncing] = useState(false);
   const prevMissionDone = useRef(0);
   const [editingTitle, setEditingTitle] = useState("");
   const [editingDue, setEditingDue] = useState("");
@@ -110,11 +112,36 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
     prevMissionDone.current = missionDoneCount;
   }, [missionDoneCount, missionIds.length]);
 
-  // ミッション保存
+  // ミッション保存（localStorage + Notion）
   const saveMission = useCallback((ids: string[]) => {
     setMissionIds(ids);
-    try { localStorage.setItem("sugar-task-mission", JSON.stringify({ date: todayStr(), ids })); } catch { /* ignore */ }
+    const today = todayStr();
+    try { localStorage.setItem("sugar-task-mission", JSON.stringify({ date: today, ids })); } catch { /* ignore */ }
+    // Notionにも非同期保存（失敗してもlocalStorageがあるので問題なし）
+    fetch("/api/notion/mission", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ date: today, taskIds: ids }),
+    }).catch(console.error);
   }, []);
+
+  // 起動時にNotionからミッションを同期
+  useEffect(() => {
+    const today = todayStr();
+    setMissionSyncing(true);
+    fetch(`/api/notion/mission?date=${today}`, { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then(({ taskIds }: { taskIds: string[] }) => {
+        if (taskIds.length > 0) {
+          // Notionのデータで上書き（他デバイスで設定した可能性があるため）
+          setMissionIds(taskIds);
+          try { localStorage.setItem("sugar-task-mission", JSON.stringify({ date: today, ids: taskIds })); } catch { /* ignore */ }
+        }
+      })
+      .catch(console.error)
+      .finally(() => setMissionSyncing(false));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 「これ忘れてない？」候補タスク（期限超過・未完了・ミッション外）
   const forgottenTask = useMemo(() => {
@@ -568,6 +595,9 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
             <span style={{ marginLeft: 6, fontSize: 10, color: "var(--color-text-tertiary)", fontWeight: 400, textTransform: "none" as const, letterSpacing: 0 }}>
               {missionDoneCount === missionIds.length ? "✅ 完了！" : `${missionDoneCount}/${missionIds.length} 完了`}
             </span>
+          )}
+          {missionSyncing && (
+            <i className="ti ti-refresh" style={{ marginLeft: "auto", fontSize: 11, color: "var(--color-text-tertiary)", animation: "spin 1s linear infinite" }} aria-hidden="true" />
           )}
         </div>
         {renderMissionSection()}
