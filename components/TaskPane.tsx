@@ -143,8 +143,9 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
   });
   const [bonusSelecting, setBonusSelecting] = useState(false);
   const [bonusDraft, setBonusDraft] = useState<string[]>([]);
-  const prevMissionDone = useRef(0);
-  const prevBonusDone = useRef(0);
+  // リロード後の誤発火を防ぐ: 初期値を今日のmissionDoneCountで設定
+  const prevMissionDone = useRef<number>(-1);  // -1 = 未初期化
+  const prevBonusDone   = useRef<number>(-1);
   const [missionCollapsed, setMissionCollapsed] = useState(false);
   // チェック連打防止
   const lastToggleMs = useRef<Record<string, number>>({});
@@ -180,8 +181,13 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
     [bonusIds, tasks]
   );
 
-  // ミッション全完了で紙吹雪
+  // ミッション全完了で紙吹雪（未初期化時は現在値で初期化してスキップ）
   useEffect(() => {
+    if (prevMissionDone.current === -1) {
+      // 初回: 現在の完了数をベースラインとして設定（リロード後の誤発火を防ぐ）
+      prevMissionDone.current = missionDoneCount;
+      return;
+    }
     if (missionIds.length > 0 && missionDoneCount === missionIds.length && prevMissionDone.current < missionIds.length) {
       setShowCelebration(true);
       setTimeout(() => setShowCelebration(false), 4500);
@@ -189,8 +195,12 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
     prevMissionDone.current = missionDoneCount;
   }, [missionDoneCount, missionIds.length]);
 
-  // ボーナス全完了でスーパー紙吹雪
+  // ボーナス全完了でスーパー紙吹雪（同様に初回スキップ）
   useEffect(() => {
+    if (prevBonusDone.current === -1) {
+      prevBonusDone.current = bonusDoneCount;
+      return;
+    }
     if (bonusIds.length > 0 && bonusDoneCount === bonusIds.length && prevBonusDone.current < bonusIds.length) {
       setShowSuperCelebration(true);
       setTimeout(() => setShowSuperCelebration(false), 5500);
@@ -252,11 +262,11 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
       .finally(() => setMissionSyncing(false));
   }, []);
 
-  // 起動時 + バックグラウンド復帰時にNotion同期（Page Visibility API）
+  // 起動時 + バックグラウンド復帰時 + 30秒ポーリングでNotion同期
   useEffect(() => {
     syncMissionFromNotion(); // 初回
     let lastHidden = 0;
-    const STALE_MS = 5_000; // 5秒以上バックグラウンドなら再同期（PC↔スマホ切り替え対応）
+    const STALE_MS = 5_000; // 5秒以上バックグラウンドなら再同期
     const handleVisibility = () => {
       if (document.visibilityState === "hidden") {
         lastHidden = Date.now();
@@ -265,7 +275,14 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
       }
     };
     document.addEventListener("visibilitychange", handleVisibility);
-    return () => document.removeEventListener("visibilitychange", handleVisibility);
+    // 30秒ごとにポーリング（PC↔スマホ即時同期）
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") syncMissionFromNotion();
+    }, 30_000);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      clearInterval(timer);
+    };
   }, [syncMissionFromNotion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 「これ忘れてない？」候補タスク（期限超過・未完了・ミッション外）
@@ -772,6 +789,7 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
         <div
           style={{ ...styles.sectionHeader, cursor: "pointer", userSelect: "none" }}
           onClick={() => setMissionCollapsed((v) => !v)}
+          onTouchEnd={(e) => { e.stopPropagation(); setMissionCollapsed((v) => !v); }}
         >
           <i className="ti ti-target" style={{ fontSize: 11, marginRight: 5 }} aria-hidden="true" />
           今日のミッション
