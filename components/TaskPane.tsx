@@ -791,6 +791,31 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
         </div>
         {!missionCollapsed && renderMissionSection()}
         {!missionCollapsed && renderForgotSection()}
+        {missionCollapsed && bonusIds.length > 0 && (
+          <div style={{ borderTop: "1px solid #FFD700", padding: "6px 10px 8px" }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: "#854F0B", letterSpacing: "0.04em", marginBottom: 4, display: "flex", alignItems: "center", gap: 5 }}>
+              <i className="ti ti-star" style={{ fontSize: 11 }} />
+              ボーナスミッション {bonusDoneCount}/{bonusIds.length}
+            </div>
+            {bonusIds.map((id, i) => {
+              const task = tasks.find((t) => t.id === id);
+              if (!task) return null;
+              return (
+                <div key={id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 0" }}>
+                  <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); safeToggle(id); }}
+                    style={{ ...styles.checkbox, background: task.done ? "#FFF8E1" : "transparent", borderColor: task.done ? "#FFD700" : "var(--color-border-mid)", flexShrink: 0 }}
+                  >
+                    {task.done && <i className="ti ti-check" style={{ fontSize: 10, color: "#854F0B" }} />}
+                  </button>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: "#854F0B", flexShrink: 0 }}>+{i + 1}</span>
+                  <span className="task-item-title" style={{ fontSize: 12, color: task.done ? "var(--color-text-tertiary)" : "var(--color-text-primary)", textDecoration: task.done ? "line-through" : "none", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {task.title}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* ── 下段: タスク一覧 ── */}
