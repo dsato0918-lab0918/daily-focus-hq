@@ -134,7 +134,13 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
   const [showCelebration, setShowCelebration] = useState(false);
   const [showSuperCelebration, setShowSuperCelebration] = useState(false);
   const [missionSyncing, setMissionSyncing] = useState(false);
-  const [bonusIds, setBonusIds] = useState<string[]>([]);
+  const [bonusIds, setBonusIds] = useState<string[]>(() => {
+    try {
+      const s = localStorage.getItem("sugar-task-bonus");
+      if (s) { const { date, ids } = JSON.parse(s); if (date === todayStr()) return ids as string[]; }
+    } catch { /* ignore */ }
+    return [];
+  });
   const [bonusSelecting, setBonusSelecting] = useState(false);
   const [bonusDraft, setBonusDraft] = useState<string[]>([]);
   const prevMissionDone = useRef(0);
@@ -192,19 +198,31 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
     prevBonusDone.current = bonusDoneCount;
   }, [bonusDoneCount, bonusIds.length]);
 
+  // Notionへ保存する共通関数（ミッション・ボーナス両方を送る）
+  const saveToNotion = useCallback((mIds: string[], bIds: string[]) => {
+    fetch("/api/notion/mission", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ date: todayStr(), taskIds: mIds, bonusIds: bIds }),
+    }).catch(console.error);
+  }, []);
+
   // ミッション保存（localStorage + Notion）
   const saveMission = useCallback((ids: string[]) => {
     setMissionIds(ids);
     const today = todayStr();
     try { localStorage.setItem("sugar-task-mission", JSON.stringify({ date: today, ids })); } catch { /* ignore */ }
-    // Notionにも非同期保存（失敗してもlocalStorageがあるので問題なし）
-    fetch("/api/notion/mission", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "same-origin",
-      body: JSON.stringify({ date: today, taskIds: ids }),
-    }).catch(console.error);
-  }, []);
+    saveToNotion(ids, bonusIds);
+  }, [bonusIds, saveToNotion]);
+
+  // ボーナス保存（localStorage + Notion）
+  const saveBonus = useCallback((ids: string[]) => {
+    setBonusIds(ids);
+    const today = todayStr();
+    try { localStorage.setItem("sugar-task-bonus", JSON.stringify({ date: today, ids })); } catch { /* ignore */ }
+    saveToNotion(missionIds, ids);
+  }, [missionIds, saveToNotion]);
 
   // チェック連打防止ラッパー
   const safeToggle = useCallback((id: string) => {
@@ -214,16 +232,20 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
     onToggleDone(id);
   }, [onToggleDone]);
 
-  // Notionからミッションを同期する関数
+  // Notionからミッション＋ボーナスを同期する関数
   const syncMissionFromNotion = useCallback(() => {
     const today = todayStr();
     setMissionSyncing(true);
     fetch(`/api/notion/mission?date=${today}`, { credentials: "same-origin" })
       .then((r) => r.json())
-      .then(({ taskIds }: { taskIds: string[] }) => {
+      .then(({ taskIds, bonusIds: bIds }: { taskIds: string[]; bonusIds: string[] }) => {
         if (taskIds.length > 0) {
           setMissionIds(taskIds);
           try { localStorage.setItem("sugar-task-mission", JSON.stringify({ date: today, ids: taskIds })); } catch { /* ignore */ }
+        }
+        if (bIds && bIds.length > 0) {
+          setBonusIds(bIds);
+          try { localStorage.setItem("sugar-task-bonus", JSON.stringify({ date: today, ids: bIds })); } catch { /* ignore */ }
         }
       })
       .catch(console.error)
@@ -671,7 +693,7 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
               <button
                 style={{ ...styles.missionConfirmBtn, background: "#FFD700", color: "#854F0B" }}
                 disabled={bonusDraft.length === 0}
-                onClick={() => { setBonusIds(bonusDraft); setBonusSelecting(false); prevBonusDone.current = 0; }}
+                onClick={() => { saveBonus(bonusDraft); setBonusSelecting(false); prevBonusDone.current = 0; }}
               >
                 {bonusDraft.length > 0 ? `${bonusDraft.length}つ追加！` : "タスクを選んでください"}
               </button>

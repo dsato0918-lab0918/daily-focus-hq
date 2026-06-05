@@ -33,8 +33,10 @@ export async function GET(req: NextRequest) {
     if (!page) return NextResponse.json({ taskIds: [] });
 
     const raw = page.properties["タスクIDs"]?.rich_text?.[0]?.plain_text ?? "";
-    const taskIds = raw ? raw.split(",").filter(Boolean) : [];
-    return NextResponse.json({ taskIds });
+    const [missionPart, bonusPart] = raw.split("||");
+    const taskIds  = missionPart ? missionPart.split(",").filter(Boolean) : [];
+    const bonusIds = bonusPart   ? bonusPart.split(",").filter(Boolean)   : [];
+    return NextResponse.json({ taskIds, bonusIds });
   } catch (e) {
     console.error("mission GET error:", e);
     return NextResponse.json({ taskIds: [] });
@@ -45,10 +47,12 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   if (!MISSION_DB_ID) return NextResponse.json({ ok: false, reason: "no db" });
 
-  const { date, taskIds } = await req.json() as { date: string; taskIds: string[] };
+  const { date, taskIds, bonusIds = [] } = await req.json() as { date: string; taskIds: string[]; bonusIds?: string[] };
   if (!date) return NextResponse.json({ ok: false });
 
-  const idsText = taskIds.join(",");
+  const idsText = bonusIds.length > 0
+    ? `${taskIds.join(",")}||${bonusIds.join(",")}`
+    : taskIds.join(",");
 
   try {
     // 既存レコードを検索
