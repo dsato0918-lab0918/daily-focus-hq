@@ -53,6 +53,63 @@ function sortTasks(tasks: Task[], key: SortKey): Task[] {
   return withDone(arr);
 }
 
+
+// ── 紙吹雪（通常）────────────────────────────────────────────────
+const COLORS_NORMAL = ["#185FA5","#378ADD","#FFD700","#FF6B6B","#51CF66","#FF8C00","#9B59B6","#E91E63"];
+const COLORS_SUPER  = ["#FFD700","#FFC107","#FF6B6B","#FF8C00","#E91E63","#185FA5","#51CF66","#9B59B6","#00BCD4","#FF5722"];
+
+function makePieces(count: number, colors: string[]) {
+  return Array.from({ length: count }, (_, i) => ({
+    id: i, color: colors[i % colors.length],
+    left: Math.random() * 100,
+    delay: Math.random() * 1.8,
+    duration: 2.5 + Math.random() * 2.5,
+    size: 7 + Math.random() * 10,
+    isCircle: Math.random() > 0.5,
+  }));
+}
+
+function ConfettiOverlay({ super: isSuper }: { super?: boolean }) {
+  const pieces = useMemo(
+    () => makePieces(isSuper ? 160 : 90, isSuper ? COLORS_SUPER : COLORS_NORMAL),
+    [] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  return (
+    <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 9999, overflow: "hidden" }}>
+      {pieces.map((p) => (
+        <div key={p.id} style={{
+          position: "absolute", left: `${p.left}%`, top: "-20px",
+          width: p.size, height: p.size, background: p.color,
+          borderRadius: p.isCircle ? "50%" : "2px",
+          animation: `confettiFall ${p.duration}s ${p.delay}s ease-in forwards`,
+        }} />
+      ))}
+      {isSuper ? (
+        <div style={{ position: "absolute", top: "28%", left: "50%", transform: "translateX(-50%)", textAlign: "center", animation: "celebrationPop 0.4s ease-out forwards", whiteSpace: "nowrap" }}>
+          <div style={{ fontSize: 70 }}>🏆</div>
+          <div style={{ fontSize: 16, marginTop: 4 }}>🎊 🎉 🎊</div>
+          <div style={{ marginTop: 10, fontSize: 22, fontWeight: 700, color: "#854F0B", background: "linear-gradient(135deg,#FFF8E1,#FFF3CD)", padding: "12px 32px", borderRadius: 18, boxShadow: "0 6px 30px rgba(186,117,23,0.35)", border: "2px solid #FFD700" }}>
+            ボーナスミッション完了！
+          </div>
+          <div style={{ marginTop: 10, fontSize: 18, fontWeight: 700, color: "#185FA5", background: "white", padding: "8px 24px", borderRadius: 12, boxShadow: "0 4px 20px rgba(0,0,0,0.18)" }}>
+            今日は最高でした！✨
+          </div>
+        </div>
+      ) : (
+        <div style={{ position: "absolute", top: "32%", left: "50%", transform: "translateX(-50%)", textAlign: "center", animation: "celebrationPop 0.5s ease-out forwards", whiteSpace: "nowrap" }}>
+          <div style={{ fontSize: 58 }}>🎉</div>
+          <div style={{ marginTop: 10, fontSize: 20, fontWeight: 700, color: "#185FA5", background: "white", padding: "10px 28px", borderRadius: 16, boxShadow: "0 4px 24px rgba(0,0,0,0.18)" }}>
+            今日のミッション完了！
+          </div>
+          <div style={{ marginTop: 8, fontSize: 13, color: "#64748B", background: "white", padding: "4px 16px", borderRadius: 8 }}>
+            お疲れさまでした ✨
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function TaskPane({ tasks, projects, domains, curDomain, curProjId, selTaskId, onSelectTask, onToggleDone, onAddTask, onUpdateTask, onDeleteTask }: Props) {
   const [hoveredTaskId, setHoveredTaskId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortKey>("default");
@@ -75,8 +132,15 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
   const [missionSelecting, setMissionSelecting] = useState(false);
   const [missionDraft, setMissionDraft] = useState<string[]>([]);
   const [showCelebration, setShowCelebration] = useState(false);
+  const [showSuperCelebration, setShowSuperCelebration] = useState(false);
   const [missionSyncing, setMissionSyncing] = useState(false);
+  const [bonusIds, setBonusIds] = useState<string[]>([]);
+  const [bonusSelecting, setBonusSelecting] = useState(false);
+  const [bonusDraft, setBonusDraft] = useState<string[]>([]);
   const prevMissionDone = useRef(0);
+  const prevBonusDone = useRef(0);
+  // チェック連打防止
+  const lastToggleMs = useRef<Record<string, number>>({});
   const [editingTitle, setEditingTitle] = useState("");
   const [editingDue, setEditingDue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -103,14 +167,29 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
     [missionIds, tasks]
   );
 
+  // ボーナス達成数
+  const bonusDoneCount = useMemo(
+    () => bonusIds.filter((id) => tasks.find((t) => t.id === id)?.done).length,
+    [bonusIds, tasks]
+  );
+
   // ミッション全完了で紙吹雪
   useEffect(() => {
-    if (missionIds.length === 3 && missionDoneCount === 3 && prevMissionDone.current < 3) {
+    if (missionIds.length > 0 && missionDoneCount === missionIds.length && prevMissionDone.current < missionIds.length) {
       setShowCelebration(true);
       setTimeout(() => setShowCelebration(false), 4500);
     }
     prevMissionDone.current = missionDoneCount;
   }, [missionDoneCount, missionIds.length]);
+
+  // ボーナス全完了でスーパー紙吹雪
+  useEffect(() => {
+    if (bonusIds.length > 0 && bonusDoneCount === bonusIds.length && prevBonusDone.current < bonusIds.length) {
+      setShowSuperCelebration(true);
+      setTimeout(() => setShowSuperCelebration(false), 5500);
+    }
+    prevBonusDone.current = bonusDoneCount;
+  }, [bonusDoneCount, bonusIds.length]);
 
   // ミッション保存（localStorage + Notion）
   const saveMission = useCallback((ids: string[]) => {
@@ -125,6 +204,14 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
       body: JSON.stringify({ date: today, taskIds: ids }),
     }).catch(console.error);
   }, []);
+
+  // チェック連打防止ラッパー
+  const safeToggle = useCallback((id: string) => {
+    const now = Date.now();
+    if (now - (lastToggleMs.current[id] ?? 0) < 600) return;
+    lastToggleMs.current[id] = now;
+    onToggleDone(id);
+  }, [onToggleDone]);
 
   // Notionからミッションを同期する関数
   const syncMissionFromNotion = useCallback(() => {
@@ -424,40 +511,6 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
     return rows;
   };
 
-  // ── 紙吹雪コンポーネント ──────────────────────────────────────
-  const Confetti = () => {
-    const COLORS = ["#185FA5","#378ADD","#FFD700","#FF6B6B","#51CF66","#FF8C00","#9B59B6","#E91E63"];
-    const pieces = useRef(Array.from({ length: 90 }, (_, i) => ({
-      id: i, color: COLORS[i % COLORS.length],
-      left: Math.random() * 100, delay: Math.random() * 1.8,
-      duration: 2.5 + Math.random() * 2,
-      size: 7 + Math.random() * 9,
-      isCircle: Math.random() > 0.5,
-      rotateEnd: 360 + Math.random() * 720,
-    }))).current;
-    return (
-      <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 9999, overflow: "hidden" }}>
-        {pieces.map((p) => (
-          <div key={p.id} style={{
-            position: "absolute", left: `${p.left}%`, top: "-20px",
-            width: p.size, height: p.size, background: p.color,
-            borderRadius: p.isCircle ? "50%" : "2px",
-            animation: `confettiFall ${p.duration}s ${p.delay}s ease-in forwards`,
-          }} />
-        ))}
-        <div style={{ position: "absolute", top: "32%", left: "50%", transform: "translateX(-50%)", textAlign: "center", animation: "celebrationPop 0.5s ease-out forwards" }}>
-          <div style={{ fontSize: 58 }}>🎉</div>
-          <div style={{ marginTop: 10, fontSize: 20, fontWeight: 700, color: "#185FA5", background: "white", padding: "10px 28px", borderRadius: 16, boxShadow: "0 4px 24px rgba(0,0,0,0.18)", whiteSpace: "nowrap" }}>
-            今日のミッション完了！
-          </div>
-          <div style={{ marginTop: 8, fontSize: 13, color: "#64748B", background: "white", padding: "4px 16px", borderRadius: 8 }}>
-            お疲れさまでした ✨
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   // ── 今日のミッションセクション ────────────────────────────────
   const renderMissionSection = () => {
     const allUndone = tasks
@@ -549,7 +602,7 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
             <div key={id} onClick={() => onSelectTask(id)}
               style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 4px", cursor: "pointer", borderRadius: 6, marginBottom: 2 }}
             >
-              <button onClick={(e) => { e.stopPropagation(); onToggleDone(id); }}
+              <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); safeToggle(id); }}
                 style={{ ...styles.checkbox, background: task.done ? "var(--color-success-bg)" : "transparent", borderColor: task.done ? "var(--color-success-text)" : "var(--color-border-mid)", flexShrink: 0 }}
               >
                 {task.done && <i className="ti ti-check" style={{ fontSize: 10, color: "var(--color-success-text)" }} />}
@@ -567,6 +620,95 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
         >
           <i className="ti ti-edit" style={{ fontSize: 11 }} /> 変更する
         </button>
+
+        {/* 全完了時: 追加で頑張る？ボタン */}
+        {allDone && bonusIds.length === 0 && !bonusSelecting && (
+          <button
+            style={{ ...styles.missionStartBtn, marginTop: 8, width: "100%", justifyContent: "center", background: "#FFF8E1", borderColor: "#FFD700", color: "#854F0B" }}
+            onClick={() => { setBonusDraft([]); setBonusSelecting(true); }}
+          >
+            <i className="ti ti-plus" aria-hidden="true" /> 追加で頑張る？
+          </button>
+        )}
+
+        {/* ボーナス選択モード */}
+        {bonusSelecting && (
+          <div style={{ ...styles.missionSelectPanel, marginTop: 8, border: "1px solid #FFD700", borderRadius: 8 }}>
+            <div style={{ ...styles.missionSelectTitle, background: "#FFF8E1", color: "#854F0B" }}>
+              <i className="ti ti-star" style={{ fontSize: 13 }} aria-hidden="true" />
+              ボーナスタスクを選んでください（最大3つ）
+              <span style={{ marginLeft: "auto", fontSize: 10 }}>{bonusDraft.length} / 3</span>
+            </div>
+            <div style={{ maxHeight: 180, overflowY: "auto" }}>
+              {tasks.filter((t) => !t.done && !missionIds.includes(t.id) && !projMap.get(t.projId)?.archived)
+                .sort((a, b) => parseDueDate(a.due).getTime() - parseDueDate(b.due).getTime())
+                .map((task) => {
+                  const proj = projMap.get(task.projId);
+                  const isChecked = bonusDraft.includes(task.id);
+                  return (
+                    <div key={task.id}
+                      onClick={() => {
+                        if (isChecked) setBonusDraft((p) => p.filter((id) => id !== task.id));
+                        else if (bonusDraft.length < 3) setBonusDraft((p) => [...p, task.id]);
+                      }}
+                      style={{ ...styles.missionSelectRow, background: isChecked ? "#FFF8E1" : "transparent", opacity: bonusDraft.length >= 3 && !isChecked ? 0.4 : 1, cursor: bonusDraft.length >= 3 && !isChecked ? "not-allowed" : "pointer" }}
+                    >
+                      <div style={{ ...styles.missionCheckbox, borderColor: isChecked ? "#FFD700" : "var(--color-border-mid)", background: isChecked ? "#FFD700" : "transparent" }}>
+                        {isChecked && <i className="ti ti-check" style={{ fontSize: 9, color: "#854F0B" }} />}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="task-item-title" style={{ fontSize: 12 }}>{task.title}</div>
+                        <div style={{ fontSize: 10, color: "var(--color-text-tertiary)" }}>
+                          {proj?.name}{task.due ? ` · ${formatDueDisplay(task.due)}` : ""}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+            <div style={{ display: "flex", gap: 6, padding: "8px 10px", borderTop: "0.5px solid #FFD700" }}>
+              <button
+                style={{ ...styles.missionConfirmBtn, background: "#FFD700", color: "#854F0B" }}
+                disabled={bonusDraft.length === 0}
+                onClick={() => { setBonusIds(bonusDraft); setBonusSelecting(false); prevBonusDone.current = 0; }}
+              >
+                {bonusDraft.length > 0 ? `${bonusDraft.length}つ追加！` : "タスクを選んでください"}
+              </button>
+              <button style={styles.missionCancelBtn} onClick={() => { setBonusSelecting(false); setBonusDraft([]); }}>キャンセル</button>
+            </div>
+          </div>
+        )}
+
+        {/* ボーナスタスク一覧 */}
+        {bonusIds.length > 0 && !bonusSelecting && (
+          <div style={{ marginTop: 8, borderTop: "1px solid #FFD700", paddingTop: 8 }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: "#854F0B", letterSpacing: "0.04em", marginBottom: 4, display: "flex", alignItems: "center", gap: 5 }}>
+              <i className="ti ti-star" style={{ fontSize: 11 }} />
+              ボーナスミッション {bonusDoneCount}/{bonusIds.length}
+            </div>
+            {bonusIds.map((id, i) => {
+              const task = tasks.find((t) => t.id === id);
+              if (!task) return null;
+              const proj = projMap.get(task.projId);
+              return (
+                <div key={id} onClick={() => onSelectTask(id)}
+                  style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 4px", cursor: "pointer", borderRadius: 6, marginBottom: 2 }}
+                >
+                  <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); safeToggle(id); }}
+                    style={{ ...styles.checkbox, background: task.done ? "#FFF8E1" : "transparent", borderColor: task.done ? "#FFD700" : "var(--color-border-mid)", flexShrink: 0 }}
+                  >
+                    {task.done && <i className="ti ti-check" style={{ fontSize: 10, color: "#854F0B" }} />}
+                  </button>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: "#854F0B", flexShrink: 0 }}>+{i + 1}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="task-item-title" style={{ fontSize: 12, color: task.done ? "var(--color-text-tertiary)" : "var(--color-text-primary)", textDecoration: task.done ? "line-through" : "none" }}>{task.title}</div>
+                    {proj && <div style={{ fontSize: 10, color: "var(--color-text-tertiary)" }}>{proj.name}</div>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   };
@@ -599,7 +741,8 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
       <div style={styles.paneHeader}>タスク管理</div>
 
       {/* ── 紙吹雪 ── */}
-      {showCelebration && <Confetti />}
+      {showCelebration      && <ConfettiOverlay />}
+      {showSuperCelebration && <ConfettiOverlay super />}
 
       {/* ── 上段: 今日のミッション ── */}
       <div style={{ ...styles.focusSection, maxHeight: missionSelecting ? "340px" : undefined }}>
