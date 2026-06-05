@@ -256,7 +256,7 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
   useEffect(() => {
     syncMissionFromNotion(); // 初回
     let lastHidden = 0;
-    const STALE_MS = 30_000; // 30秒以上バックグラウンドなら再同期
+    const STALE_MS = 5_000; // 5秒以上バックグラウンドなら再同期（PC↔スマホ切り替え対応）
     const handleVisibility = () => {
       if (document.visibilityState === "hidden") {
         lastHidden = Date.now();
