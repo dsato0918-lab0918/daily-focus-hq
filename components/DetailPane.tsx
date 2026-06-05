@@ -53,6 +53,8 @@ export default function DetailPane({ task, project, onMemoChange, onUpdateTask, 
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showStaffRequest, setShowStaffRequest] = useState(false);
   const [requestSent, setRequestSent] = useState(false);
+  const [slackSending, setSlackSending] = useState(false);
+  const [slackError, setSlackError] = useState<string | null>(null);
   const [showVendorRequest, setShowVendorRequest] = useState(false);
   const [vendorSent, setVendorSent] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -72,7 +74,7 @@ export default function DetailPane({ task, project, onMemoChange, onUpdateTask, 
     else { setConfirmDelete(true); setTimeout(() => setConfirmDelete(false), 3000); }
   };
 
-  // タスクが変わったらチャット・依頼パネルをリセット
+  // タスクが変わったらリセット
   useEffect(() => {
     setChatOpen(false);
     setMessages([]);
@@ -323,22 +325,45 @@ export default function DetailPane({ task, project, onMemoChange, onUpdateTask, 
             <pre style={styles.draftText}>{staffRequestDraft}</pre>
             {requestSent ? (
               <div style={styles.sentBadge}>
-                <i className="ti ti-clock" style={{ fontSize: 11 }} /> Slack連携後に送信できます
+                <i className="ti ti-check" style={{ fontSize: 11 }} /> Slackに送信しました！
               </div>
             ) : (
-              <button
-                style={styles.slackSendBtn}
-                onClick={() => {
-                  const ts = new Date().toLocaleString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
-                  const note = `[スタッフへ依頼: ${ts}]`;
-                  onMemoChange(task.id, task.memo ? `${task.memo}\n${note}` : note);
-                  onUpdateTask(task.id, { staffRequested: true });
-                  setRequestSent(true);
-                }}
-              >
-                <i className="ti ti-brand-slack" style={{ fontSize: 13 }} />
-                Slackに送信する
-              </button>
+              <>
+                <button
+                  style={styles.slackSendBtn}
+                  onClick={async () => {
+                    setSlackSending(true);
+                    try {
+                      const res = await fetch("/api/slack/send", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        credentials: "same-origin",
+                        body: JSON.stringify({ message: staffRequestDraft }),
+                      });
+                      if (!res.ok) throw new Error("送信失敗");
+                      const ts = new Date().toLocaleString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+                      const note = `[スタッフへ依頼: ${ts}]`;
+                      onMemoChange(task.id, task.memo ? `${task.memo}\n${note}` : note);
+                      onUpdateTask(task.id, { staffRequested: true });
+                      setRequestSent(true);
+                      setSlackError(null);
+                    } catch {
+                      setSlackError("送信に失敗しました。Slack連携設定を確認してください。");
+                    } finally {
+                      setSlackSending(false);
+                    }
+                  }}
+                  disabled={slackSending}
+                >
+                  <i className={`ti ${slackSending ? "ti-loader-2" : "ti-brand-slack"}`} style={{ fontSize: 13, animation: slackSending ? "spin 1s linear infinite" : undefined }} />
+                  {slackSending ? "送信中..." : "Slackに送信する"}
+                </button>
+                {slackError && (
+                  <div style={{ fontSize: 11, color: "#A32D2D", marginTop: 6, padding: "4px 8px", background: "#FCEBEB", borderRadius: 4 }}>
+                    {slackError}
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
