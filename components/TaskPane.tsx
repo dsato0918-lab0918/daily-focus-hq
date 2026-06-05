@@ -139,6 +139,7 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
   const [bonusDraft, setBonusDraft] = useState<string[]>([]);
   const prevMissionDone = useRef(0);
   const prevBonusDone = useRef(0);
+  const [missionCollapsed, setMissionCollapsed] = useState(false);
   // チェック連打防止
   const lastToggleMs = useRef<Record<string, number>>({});
   const [editingTitle, setEditingTitle] = useState("");
@@ -746,7 +747,10 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
 
       {/* ── 上段: 今日のミッション ── */}
       <div style={{ ...styles.focusSection, maxHeight: missionSelecting ? "340px" : undefined }}>
-        <div style={styles.sectionHeader}>
+        <div
+          style={{ ...styles.sectionHeader, cursor: "pointer", userSelect: "none" }}
+          onClick={() => setMissionCollapsed((v) => !v)}
+        >
           <i className="ti ti-target" style={{ fontSize: 11, marginRight: 5 }} aria-hidden="true" />
           今日のミッション
           {missionIds.length > 0 && !missionSelecting && (
@@ -755,11 +759,16 @@ export default function TaskPane({ tasks, projects, domains, curDomain, curProjI
             </span>
           )}
           {missionSyncing && (
-            <i className="ti ti-refresh" style={{ marginLeft: "auto", fontSize: 11, color: "var(--color-text-tertiary)", animation: "spin 1s linear infinite" }} aria-hidden="true" />
+            <i className="ti ti-refresh" style={{ fontSize: 11, color: "var(--color-text-tertiary)", animation: "spin 1s linear infinite" }} aria-hidden="true" />
           )}
+          <i
+            className={`ti ${missionCollapsed ? "ti-chevron-right" : "ti-chevron-down"}`}
+            style={{ marginLeft: "auto", fontSize: 12, color: "var(--color-text-tertiary)" }}
+            aria-hidden="true"
+          />
         </div>
-        {renderMissionSection()}
-        {renderForgotSection()}
+        {!missionCollapsed && renderMissionSection()}
+        {!missionCollapsed && renderForgotSection()}
       </div>
 
       {/* ── 下段: タスク一覧 ── */}
